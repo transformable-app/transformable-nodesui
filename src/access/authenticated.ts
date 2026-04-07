@@ -1,0 +1,10 @@
+import type { AccessArgs } from 'payload'
+
+import type { User } from '@/payload-types'
+import { userHasCustomerRole } from './contentManagerRestrictions'
+
+type isAuthenticated = (args: AccessArgs<User>) => boolean
+
+export const authenticated: isAuthenticated = ({ req: { user } }) => {
+  return Boolean(user) && !userHasCustomerRole(user)
+}

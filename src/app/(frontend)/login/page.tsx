@@ -1,0 +1,93 @@
+import type { Metadata } from 'next'
+
+import { RenderParams } from '@/components/RenderParams'
+import React from 'react'
+
+import { headers as getHeaders } from 'next/headers'
+import configPromise from '@payload-config'
+import { getPayload } from 'payload'
+import { LoginForm } from '@/components/forms/LoginForm'
+import { redirect } from 'next/navigation'
+import { getCachedGlobal } from '@/utilities/getGlobals'
+import type { AdminSetting, Header as HeaderType } from '@/payload-types'
+import { getMediaUrl } from '@/utilities/getMediaUrl'
+import Link from 'next/link'
+import { LayoutDashboard } from 'lucide-react'
+
+export default async function Login() {
+  const headers = await getHeaders()
+  const payload = await getPayload({ config: configPromise })
+  const [{ user }, adminSettings, headerDataResult] = await Promise.all([
+    payload.auth({ headers }),
+    getCachedGlobal('admin-settings', 1)(),
+    getCachedGlobal('header', 1)(),
+  ])
+  const settings = adminSettings as AdminSetting
+  const headerData = headerDataResult as HeaderType
+
+  if (user) {
+    redirect(`/account?warning=${encodeURIComponent('You are already logged in.')}`)
+  }
+
+  const allowFrontendCreateAccount = settings.allowFrontendCreateAccount !== false
+  const logo =
+    headerData?.logo && typeof headerData.logo === 'object' && 'url' in headerData.logo
+      ? getMediaUrl(headerData.logo.url as string)
+      : null
+  const sidebarLabel = headerData.dashboardSidebarLabel || 'Dash'
+  const sidebarText = headerData.dashboardSidebarText || 'Configurable header nav'
+
+  return (
+    <article className="pb-8 pt-8 sm:pb-12 sm:pt-12">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:flex-row lg:px-8">
+        <section className="overflow-hidden rounded-2xl border bg-card shadow lg:w-[320px] lg:shrink-0">
+          <div className="border-b p-6">
+            <Link className="flex items-center gap-3" href="/">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl border bg-background text-foreground">
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img alt={sidebarLabel} className="h-9 w-9 object-contain" src={logo} />
+                ) : (
+                  <LayoutDashboard className="h-6 w-6 text-primary" />
+                )}
+              </div>
+              <div>
+                <p className="text-base font-semibold text-foreground">{sidebarLabel}</p>
+                {sidebarText ? (
+                  <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                    {sidebarText}
+                  </p>
+                ) : null}
+              </div>
+            </Link>
+          </div>
+          <div className="space-y-3 p-6">
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-muted-foreground">
+              Welcome back
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Log in</h1>
+            <RenderParams messageClassName="!my-0 !bg-transparent !p-0 text-left text-sm text-muted-foreground" />
+          </div>
+        </section>
+
+        <section className="min-w-0 flex-1 rounded-2xl border bg-card p-8 shadow sm:p-10">
+          <div className="max-w-xl">
+            {!allowFrontendCreateAccount ? (
+              <p className="mb-6 text-muted-foreground">Account sign-up is currently disabled.</p>
+            ) : null}
+            <LoginForm allowCreateAccount={allowFrontendCreateAccount} />
+          </div>
+        </section>
+      </div>
+    </article>
+  )
+}
+
+export const metadata: Metadata = {
+  description: 'Login or create an account to get started.',
+  openGraph: {
+    title: 'Login',
+    url: '/login',
+  },
+  title: 'Login',
+}

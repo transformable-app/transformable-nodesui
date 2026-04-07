@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 20 66% 99%;
+    --foreground: 20 51% 4%;
+    --card: 20 66% 98%;
+    --card-foreground: 20 51% 3%;
+    --popover: 20 66% 98%;
+    --popover-foreground: 20 51% 3%;
+    --primary: 21 100% 50%;
+    --primary-foreground: 253 91% 98%;
+    --secondary: 27 91% 62%;
+    --secondary-foreground: 253 7% 69%;
+    --muted: 20 25% 86%;
+    --muted-foreground: 20 7% 25%;
+    --accent: 20 12% 92%;
+    --accent-foreground: 20 12% 32%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 20 15% 94%;
+    --input: 20 15% 94%;
+    --ring: 21 100% 50%;
+    --radius: 0.5rem;
+  }
+
+  [data-theme='dark'] {
+    --background: 253 43% 3%;
+    --foreground: 253 31% 98%;
+    --card: 253 43% 4%;
+    --card-foreground: 253 31% 99%;
+    --popover: 253 43% 3%;
+    --popover-foreground: 253 31% 98%;
+    --primary: 21 100% 50%;
+    --primary-foreground: 253 91% 98%;
+    --secondary: 27 91% 62%;
+    --secondary-foreground: 253 7% 69%;
+    --muted: 253 7% 13%;
+    --muted-foreground: 253 13% 63%;
+    --accent: 253 13% 14%;
+    --accent-foreground: 253 13% 74%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 253 91% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply min-h-[100vh] bg-background text-foreground;
+    overflow-x: hidden;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  @media (min-width: 768px) {
+    input,
+    textarea,
+    select {
+      font-size: inherit !important;
+    }
+  }
+}
+
+html {
+  opacity: 0;
+}
+
+html[data-theme='dark'],
+html[data-theme='light'] {
+  opacity: initial;
+}

@@ -1,0 +1,73 @@
+@import '~@payloadcms/ui/scss';
+
+/* Default to the frontend palette when admin-specific overrides are not set. */
+$before-dashboard-primary: hsl(21 100% 50%);
+$before-dashboard-bg: hsl(20 66% 99%);
+$before-dashboard-text: hsl(20 51% 4%);
+$before-dashboard-bg-dark: hsl(253 43% 3%);
+$before-dashboard-text-dark: hsl(253 31% 98%);
+$before-dashboard-link-dark: hsl(27 91% 62%);
+
+.dashboard .before-dashboard {
+  margin-bottom: base(1.5);
+
+  &__banner {
+    /* Override success (green); use CSS vars from Admin settings when set. */
+    background: var(--banner-bg, $before-dashboard-bg) !important;
+    color: var(--banner-text, $before-dashboard-text) !important;
+
+    & a {
+      color: var(--banner-link, $before-dashboard-primary) !important;
+      font-weight: 600;
+
+      &:hover {
+        color: var(--banner-link-hover, $before-dashboard-primary) !important;
+        text-decoration: underline;
+      }
+    }
+
+    & h4 {
+      margin: 0;
+    }
+
+    .before-dashboard__actions {
+      margin-top: base(0.75);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Spacing only when extra content is present (sibling follows h4) */
+    .before-dashboard__banner-extra {
+      margin-top: base(0.5);
+    }
+  }
+
+  &__instructions {
+    list-style: decimal;
+    margin-bottom: base(0.5);
+
+    & li {
+      width: 100%;
+    }
+  }
+
+  & a:hover {
+    opacity: 0.85;
+  }
+}
+
+/* Dark mode: use CSS vars from Admin settings when set */
+html[data-theme='dark'] .dashboard .before-dashboard__banner {
+  background: var(--banner-bg-dark, $before-dashboard-bg-dark) !important;
+  color: var(--banner-text-dark, $before-dashboard-text-dark) !important;
+
+  a {
+    color: var(--banner-link-dark, $before-dashboard-link-dark) !important;
+
+    &:hover {
+      color: var(--banner-text-dark, $before-dashboard-text-dark) !important;
+    }
+  }
+}
