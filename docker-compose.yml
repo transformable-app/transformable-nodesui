@@ -1,31 +1,38 @@
-version: '3'
-
 services:
-  payload:
-    image: node:18-alpine
-    ports:
-      - '3000:3000'
-    volumes:
-      - .:/home/node/app
-      - node_modules:/home/node/app/node_modules
-    working_dir: /home/node/app/
-    command: sh -c "yarn install && yarn dev"
+  app:
+    image: ${NUIPAYLOAD_IMAGE:-ghcr.io/transformable-app/nuipayload:latest}
+    restart: unless-stopped
     depends_on:
       - mongo
-    env_file:
-      - .env
+    ports:
+      - '${NUIPAYLOAD_PORT:-3000}:3000'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-nuipayload}:${MONGO_INITDB_ROOT_PASSWORD:-change-me}@mongo:27017/${MONGO_DATABASE:-nuipayload}?authSource=admin
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:?set PAYLOAD_SECRET}
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?set NEXT_PUBLIC_SERVER_URL}
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
+      PREVIEW_SECRET: ${PREVIEW_SECRET:?set PREVIEW_SECRET}
+      PAYLOAD_JOBS_AUTORUN: ${PAYLOAD_JOBS_AUTORUN:-true}
+      PAYLOAD_JOBS_AUTORUN_CRON: '${PAYLOAD_JOBS_AUTORUN_CRON:-* * * * *}'
+      N8N_SYNC_CRON: '${N8N_SYNC_CRON:-0 */15 * * * *}'
+      NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${NEXT_PUBLIC_RECAPTCHA_SITE_KEY:-}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
 
   mongo:
-    image: mongo:latest
-    ports:
-      - '27017:27017'
+    image: mongo:7.0
+    restart: unless-stopped
     command:
+      - --bind_ip_all
       - --storageEngine=wiredTiger
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-nuipayload}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change-me}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-nuipayload}
     volumes:
-      - data:/data/db
-    logging:
-      driver: none
+      - mongo_data:/data/db
 
 volumes:
-  data:
-  node_modules:
+  mongo_data:
