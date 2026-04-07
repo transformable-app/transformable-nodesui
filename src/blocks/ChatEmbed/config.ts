@@ -22,6 +22,7 @@ export const ChatEmbedBlock: Block = {
     {
       name: 'embedURL',
       type: 'text',
+      label: 'Embed URL',
       required: true,
     },
     {

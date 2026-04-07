@@ -28,7 +28,6 @@ export const Servers: CollectionConfig = {
     environment: true,
     lastSuccessfulSyncAt: true,
     name: true,
-    slug: true,
     status: true,
     syncEnabled: true,
   },
@@ -37,13 +36,6 @@ export const Servers: CollectionConfig = {
       name: 'name',
       type: 'text',
       required: true,
-    },
-    {
-      name: 'slug',
-      type: 'text',
-      required: true,
-      unique: true,
-      index: true,
     },
     {
       name: 'environment',
@@ -62,6 +54,7 @@ export const Servers: CollectionConfig = {
     {
       name: 'baseURL',
       type: 'text',
+      label: 'Base URL',
       required: true,
       admin: {
         description: 'Base URL for the n8n instance, for example https://n8n.example.com.',
@@ -79,6 +72,7 @@ export const Servers: CollectionConfig = {
     {
       name: 'dashboardURL',
       type: 'text',
+      label: 'Dashboard URL',
       admin: {
         description: 'Optional direct link to the n8n UI for this server.',
       },
@@ -86,12 +80,16 @@ export const Servers: CollectionConfig = {
     {
       name: 'apiKey',
       type: 'text',
+      label: 'API Key',
       required: true,
       access: {
         read: fieldAccess,
         update: fieldAccess,
       },
       admin: {
+        components: {
+          Field: '@/components/Admin/SecretTextField#SecretTextField',
+        },
         description: 'Stored for future n8n sync jobs. Hidden from public reads.',
       },
     },

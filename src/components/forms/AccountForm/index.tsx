@@ -35,8 +35,6 @@ export const AccountForm: React.FC = () => {
   password.current = watch('password', '')
 
   const router = useRouter()
-  const accountInputClassName =
-    'bg-[#fff8e8] border-[#c8b38a] text-[#271d02] placeholder:text-[#6b5a33] focus-visible:ring-[#271d02]'
 
   const onSubmit = useCallback(
     async (data: FormData) => {
@@ -117,7 +115,6 @@ export const AccountForm: React.FC = () => {
               <Input
                 id="email"
                 {...register('email', { required: 'Please provide an email.' })}
-                className={accountInputClassName}
                 type="email"
               />
               {errors.email && <FormError message={errors.email.message} />}
@@ -130,7 +127,6 @@ export const AccountForm: React.FC = () => {
               <Input
                 id="name"
                 {...register('name', { required: 'Please provide a name.' })}
-                className={accountInputClassName}
                 type="text"
               />
               {errors.name && <FormError message={errors.name.message} />}
@@ -162,7 +158,6 @@ export const AccountForm: React.FC = () => {
               <Input
                 id="password"
                 {...register('password', { required: 'Please provide a new password.' })}
-                className={accountInputClassName}
                 type="password"
               />
               {errors.password && <FormError message={errors.password.message} />}
@@ -178,7 +173,6 @@ export const AccountForm: React.FC = () => {
                   required: 'Please confirm your new password.',
                   validate: (value) => value === password.current || 'The passwords do not match',
                 })}
-                className={accountInputClassName}
                 type="password"
               />
               {errors.passwordConfirm && <FormError message={errors.passwordConfirm.message} />}

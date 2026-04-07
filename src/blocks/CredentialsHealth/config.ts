@@ -20,6 +20,22 @@ export const CredentialsHealthBlock: Block = {
       relationTo: 'servers',
     },
     {
+      name: 'pagingMode',
+      type: 'select',
+      defaultValue: 'pagination',
+      options: [
+        {
+          label: 'Preview first page only',
+          value: 'preview',
+        },
+        {
+          label: 'Paged navigation',
+          value: 'pagination',
+        },
+      ],
+      required: true,
+    },
+    {
       name: 'limit',
       type: 'number',
       defaultValue: 10,

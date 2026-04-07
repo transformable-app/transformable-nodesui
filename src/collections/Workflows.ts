@@ -39,6 +39,7 @@ export const Workflows: CollectionConfig = {
     {
       name: 'workflowID',
       type: 'text',
+      label: 'Workflow ID',
       required: true,
       index: true,
       admin: {
@@ -52,7 +53,7 @@ export const Workflows: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Stable sync key in the form "<server-slug>:<workflowID>". Used for idempotent upserts.',
+        description: 'Stable sync key in the form "<server-id>:<workflowID>". Used for idempotent upserts.',
       },
     },
     {
@@ -82,10 +83,12 @@ export const Workflows: CollectionConfig = {
     {
       name: 'projectID',
       type: 'text',
+      label: 'Project ID',
     },
     {
       name: 'versionID',
       type: 'text',
+      label: 'Version ID',
     },
     {
       name: 'triggerCount',
@@ -100,6 +103,7 @@ export const Workflows: CollectionConfig = {
     {
       name: 'n8nURL',
       type: 'text',
+      label: 'n8n URL',
       admin: {
         description: 'Link to open the workflow in n8n.',
       },
@@ -153,7 +157,7 @@ export const Workflows: CollectionConfig = {
       name: 'apiData',
       type: 'json',
       admin: {
-        description: 'Redacted raw workflow payload from the n8n API for debugging sync mismatches.',
+        description: 'Raw workflow payload from the n8n API.',
       },
     },
   ],

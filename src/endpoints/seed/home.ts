@@ -30,6 +30,7 @@ export const home: (args: HomeArgs) => RequiredDataFromCollectionSlug<'pages'> =
         blockType: 'workflowsList',
         title: 'Workflows',
         description: 'Recently synced workflows from your connected n8n servers.',
+        pagingMode: 'pagination',
         limit: 8,
         showServer: true,
       },
@@ -37,6 +38,7 @@ export const home: (args: HomeArgs) => RequiredDataFromCollectionSlug<'pages'> =
         blockType: 'credentialsHealth',
         title: 'Credentials health',
         description: 'Credential status across connected n8n servers.',
+        pagingMode: 'pagination',
         limit: 10,
         onlyUnhealthy: false,
       },
@@ -44,6 +46,7 @@ export const home: (args: HomeArgs) => RequiredDataFromCollectionSlug<'pages'> =
         blockType: 'latestExecutions',
         title: 'Latest executions',
         description: 'Most recent execution activity across all available workflows.',
+        pagingMode: 'pagination',
         limit: 10,
       },
       {

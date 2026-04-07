@@ -234,6 +234,7 @@ export interface WorkflowsListBlock {
   title: string;
   description?: string | null;
   server?: (string | null) | Server;
+  pagingMode: 'preview' | 'pagination';
   limit: number;
   showServer?: boolean | null;
   id?: string | null;
@@ -247,7 +248,6 @@ export interface WorkflowsListBlock {
 export interface Server {
   id: string;
   name: string;
-  slug: string;
   environment: 'production' | 'staging' | 'development' | 'sandbox';
   status: 'online' | 'degraded' | 'offline' | 'unknown';
   /**
@@ -298,6 +298,7 @@ export interface CredentialsHealthBlock {
   title: string;
   description?: string | null;
   server?: (string | null) | Server;
+  pagingMode: 'preview' | 'pagination';
   limit: number;
   onlyUnhealthy?: boolean | null;
   id?: string | null;
@@ -313,6 +314,7 @@ export interface LatestExecutionsBlock {
   description?: string | null;
   server?: (string | null) | Server;
   workflow?: (string | null) | Workflow;
+  pagingMode: 'preview' | 'pagination';
   limit: number;
   id?: string | null;
   blockName?: string | null;
@@ -330,7 +332,7 @@ export interface Workflow {
    */
   workflowID: string;
   /**
-   * Stable sync key in the form "<server-slug>:<workflowID>". Used for idempotent upserts.
+   * Stable sync key in the form "<server-id>:<workflowID>". Used for idempotent upserts.
    */
   sourceKey: string;
   server: string | Server;
@@ -360,7 +362,7 @@ export interface Workflow {
     | boolean
     | null;
   /**
-   * Redacted raw workflow payload from the n8n API for debugging sync mismatches.
+   * Raw workflow payload from the n8n API.
    */
   apiData?:
     | {
@@ -417,7 +419,7 @@ export interface DataTable {
   name: string;
   slug: string;
   /**
-   * Optional stable key for job-managed tables, for example "<server-slug>:daily-revenue".
+   * Optional stable key for job-managed tables, for example "<server-id>:daily-revenue".
    */
   sourceKey?: string | null;
   /**
@@ -801,7 +803,7 @@ export interface Credential {
    */
   credentialID: string;
   /**
-   * Stable sync key in the form "<server-slug>:<credentialID>". Used for idempotent upserts.
+   * Stable sync key in the form "<server-id>:<credentialID>". Used for idempotent upserts.
    */
   sourceKey: string;
   credentialType: string;
@@ -841,7 +843,7 @@ export interface Execution {
    */
   executionID: string;
   /**
-   * Stable sync key in the form "<server-slug>:<executionID>". Used for idempotent upserts.
+   * Stable sync key in the form "<server-id>:<executionID>". Used for idempotent upserts.
    */
   sourceKey: string;
   server: string | Server;
@@ -891,7 +893,7 @@ export interface DataTableRow {
   id: string;
   table: string | DataTable;
   /**
-   * Optional stable key for sync-managed rows, for example "<server-slug>:<table-id>:<row-id>".
+   * Optional stable key for sync-managed rows, for example "<server-id>:<table-id>:<row-id>".
    */
   sourceKey?: string | null;
   /**
@@ -1242,6 +1244,7 @@ export interface WorkflowsListBlockSelect<T extends boolean = true> {
   title?: T;
   description?: T;
   server?: T;
+  pagingMode?: T;
   limit?: T;
   showServer?: T;
   id?: T;
@@ -1255,6 +1258,7 @@ export interface CredentialsHealthBlockSelect<T extends boolean = true> {
   title?: T;
   description?: T;
   server?: T;
+  pagingMode?: T;
   limit?: T;
   onlyUnhealthy?: T;
   id?: T;
@@ -1269,6 +1273,7 @@ export interface LatestExecutionsBlockSelect<T extends boolean = true> {
   description?: T;
   server?: T;
   workflow?: T;
+  pagingMode?: T;
   limit?: T;
   id?: T;
   blockName?: T;
@@ -1423,7 +1428,6 @@ export interface MediaSelect<T extends boolean = true> {
  */
 export interface ServersSelect<T extends boolean = true> {
   name?: T;
-  slug?: T;
   environment?: T;
   status?: T;
   baseURL?: T;

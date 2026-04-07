@@ -28,6 +28,7 @@ export const yourAutomationsDash = ({
         blockType: 'workflowsList',
         title: 'Workflows',
         description: 'Recently synced automations and their runtime state.',
+        pagingMode: 'pagination',
         limit: 8,
         showServer: true,
       },
@@ -35,6 +36,7 @@ export const yourAutomationsDash = ({
         blockType: 'credentialsHealth',
         title: 'Credentials health',
         description: 'Credential checks that may need attention.',
+        pagingMode: 'pagination',
         limit: 10,
         onlyUnhealthy: false,
       },
@@ -42,6 +44,7 @@ export const yourAutomationsDash = ({
         blockType: 'latestExecutions',
         title: 'Latest executions',
         description: 'Recent automation activity from newest to oldest.',
+        pagingMode: 'pagination',
         limit: 10,
       },
       {

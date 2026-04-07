@@ -46,12 +46,13 @@ export const DataTables: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Optional stable key for job-managed tables, for example "<server-slug>:daily-revenue".',
+        description: 'Optional stable key for job-managed tables, for example "<server-id>:daily-revenue".',
       },
     },
     {
       name: 'tableID',
       type: 'text',
+      label: 'Table ID',
       index: true,
       admin: {
         description: 'n8n data table ID. Use sourceKey for globally unique upserts across multiple servers.',
@@ -67,6 +68,7 @@ export const DataTables: CollectionConfig = {
     {
       name: 'projectID',
       type: 'text',
+      label: 'Project ID',
       admin: {
         description: 'n8n project or personal-space identifier when available.',
       },
@@ -120,6 +122,7 @@ export const DataTables: CollectionConfig = {
         {
           name: 'columnID',
           type: 'text',
+          label: 'Column ID',
           admin: {
             description: 'n8n column ID from the Data Table API.',
           },

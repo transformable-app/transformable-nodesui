@@ -27,6 +27,7 @@ export const Credentials: CollectionConfig = {
     {
       name: 'credentialID',
       type: 'text',
+      label: 'Credential ID',
       required: true,
       index: true,
       admin: {
@@ -40,7 +41,7 @@ export const Credentials: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Stable sync key in the form "<server-slug>:<credentialID>". Used for idempotent upserts.',
+        description: 'Stable sync key in the form "<server-id>:<credentialID>". Used for idempotent upserts.',
       },
     },
     {

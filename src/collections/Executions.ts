@@ -37,6 +37,7 @@ export const Executions: CollectionConfig = {
     {
       name: 'executionID',
       type: 'text',
+      label: 'Execution ID',
       required: true,
       index: true,
       admin: {
@@ -50,7 +51,7 @@ export const Executions: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Stable sync key in the form "<server-slug>:<executionID>". Used for idempotent upserts.',
+        description: 'Stable sync key in the form "<server-id>:<executionID>". Used for idempotent upserts.',
       },
     },
     {

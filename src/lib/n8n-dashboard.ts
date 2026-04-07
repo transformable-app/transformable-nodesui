@@ -31,6 +31,13 @@ export type WorkflowCard = {
   server?: string | RelationDoc | null
 }
 
+export type PaginatedWorkflows = {
+  docs: WorkflowCard[]
+  page: number
+  totalDocs: number
+  totalPages: number
+}
+
 export type ExecutionCard = {
   id: string
   executionID?: string | null
@@ -42,6 +49,13 @@ export type ExecutionCard = {
   errorMessage?: string | null
   server?: string | RelationDoc | null
   workflow?: string | RelationDoc | null
+}
+
+export type PaginatedExecutions = {
+  docs: ExecutionCard[]
+  page: number
+  totalDocs: number
+  totalPages: number
 }
 
 export type CredentialCard = {
@@ -56,6 +70,13 @@ export type CredentialCard = {
   remoteUpdatedAt?: string | null
   server?: string | RelationDoc | null
   summary?: string | null
+}
+
+export type PaginatedCredentials = {
+  docs: CredentialCard[]
+  page: number
+  totalDocs: number
+  totalPages: number
 }
 
 export type DataTableDoc = {
@@ -184,6 +205,43 @@ export const getWorkflows = async ({ limit, serverID }: { limit: number; serverI
   return result.docs as WorkflowCard[]
 }
 
+export const getPaginatedWorkflows = async ({
+  limit,
+  page,
+  serverID,
+}: {
+  limit: number
+  page: number
+  serverID?: string
+}) => {
+  const { payload, user } = await getRequestPayload()
+
+  const result = await payload.find({
+    collection: 'workflows',
+    depth: 1,
+    limit,
+    overrideAccess: false,
+    page,
+    pagination: true,
+    sort: '-remoteUpdatedAt',
+    user,
+    where: serverID
+      ? {
+          server: {
+            equals: serverID,
+          },
+        }
+      : undefined,
+  })
+
+  return {
+    docs: result.docs as WorkflowCard[],
+    page: result.page,
+    totalDocs: result.totalDocs,
+    totalPages: result.totalPages,
+  } as PaginatedWorkflows
+}
+
 export const getExecutions = async ({
   limit,
   onlyErrors,
@@ -237,6 +295,67 @@ export const getExecutions = async ({
   return result.docs as ExecutionCard[]
 }
 
+export const getPaginatedExecutions = async ({
+  limit,
+  onlyErrors,
+  page,
+  serverID,
+  workflowID,
+}: {
+  limit: number
+  onlyErrors?: boolean
+  page: number
+  serverID?: string
+  workflowID?: string
+}) => {
+  const { payload, user } = await getRequestPayload()
+
+  const and: Where[] = []
+
+  if (onlyErrors) {
+    and.push({
+      status: {
+        equals: 'error',
+      },
+    })
+  }
+
+  if (serverID) {
+    and.push({
+      server: {
+        equals: serverID,
+      },
+    })
+  }
+
+  if (workflowID) {
+    and.push({
+      workflow: {
+        equals: workflowID,
+      },
+    })
+  }
+
+  const result = await payload.find({
+    collection: 'executions',
+    depth: 1,
+    limit,
+    overrideAccess: false,
+    page,
+    pagination: true,
+    sort: '-startedAt',
+    user,
+    where: and.length > 0 ? { and } : undefined,
+  })
+
+  return {
+    docs: result.docs as ExecutionCard[],
+    page: result.page,
+    totalDocs: result.totalDocs,
+    totalPages: result.totalPages,
+  } as PaginatedExecutions
+}
+
 export const getCredentials = async ({
   limit,
   onlyUnhealthy,
@@ -278,6 +397,57 @@ export const getCredentials = async ({
   })
 
   return result.docs as CredentialCard[]
+}
+
+export const getPaginatedCredentials = async ({
+  limit,
+  onlyUnhealthy,
+  page,
+  serverID,
+}: {
+  limit: number
+  onlyUnhealthy?: boolean
+  page: number
+  serverID?: string
+}) => {
+  const { payload, user } = await getRequestPayload()
+
+  const and: Where[] = []
+
+  if (onlyUnhealthy) {
+    and.push({
+      isHealthy: {
+        equals: false,
+      },
+    })
+  }
+
+  if (serverID) {
+    and.push({
+      server: {
+        equals: serverID,
+      },
+    })
+  }
+
+  const result = await payload.find({
+    collection: 'credentials',
+    depth: 1,
+    limit,
+    overrideAccess: false,
+    page,
+    pagination: true,
+    sort: '-remoteUpdatedAt',
+    user,
+    where: and.length > 0 ? { and } : undefined,
+  })
+
+  return {
+    docs: result.docs as CredentialCard[],
+    page: result.page,
+    totalDocs: result.totalDocs,
+    totalPages: result.totalPages,
+  } as PaginatedCredentials
 }
 
 export const getDataTableByID = async (id: string) => {

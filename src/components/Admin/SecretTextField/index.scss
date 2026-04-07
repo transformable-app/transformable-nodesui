@@ -1,0 +1,32 @@
+.secret-text-field {
+  &__input-wrap {
+    align-items: stretch;
+    display: flex;
+    gap: calc(var(--base) / 2);
+  }
+
+  &__input-wrap input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__toggle {
+    background: var(--theme-elevation-100);
+    border: 1px solid var(--theme-elevation-250);
+    border-radius: 4px;
+    color: var(--theme-text);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    padding: 0 calc(var(--base) * 0.75);
+  }
+
+  &__toggle:hover:not(:disabled) {
+    background: var(--theme-elevation-150);
+  }
+
+  &__toggle:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}

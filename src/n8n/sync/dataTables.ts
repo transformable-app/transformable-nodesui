@@ -14,22 +14,21 @@ type SyncableServer = Pick<
   | 'lastSuccessfulSyncAt'
   | 'lastSyncedAt'
   | 'name'
-  | 'slug'
   | 'syncEnabled'
 >
 
 type N8nColumn = {
-  id?: string
+  id?: number | string
   index?: number
   name: string
   type: 'string' | 'number' | 'boolean' | 'date' | 'json'
 }
 
 type N8nDataTable = {
-  id: string
+  id: number | string
   name: string
   columns: N8nColumn[]
-  projectId: string
+  projectId: number | string
   createdAt: string
   updatedAt: string
 }
@@ -72,7 +71,7 @@ type N8nTag = {
 }
 
 type N8nWorkflow = {
-  id: string
+  id: number | string
   name: string
   active?: boolean
   createdAt?: string
@@ -88,7 +87,7 @@ type N8nWorkflow = {
 }
 
 type N8nCredential = {
-  id: string
+  id: number | string
   name: string
   type: string
   createdAt?: string
@@ -98,18 +97,18 @@ type N8nCredential = {
 }
 
 type N8nExecution = {
-  id: number
+  id: number | string
   customData?: Record<string, unknown>
   data?: Record<string, unknown>
   finished?: boolean
   mode?: string
-  retryOf?: number | null
-  retrySuccessId?: number | null
+  retryOf?: number | string | null
+  retrySuccessId?: number | string | null
   startedAt?: string
   status?: 'canceled' | 'crashed' | 'error' | 'new' | 'running' | 'success' | 'unknown' | 'waiting'
   stoppedAt?: string | null
   waitTill?: string | null
-  workflowId?: number
+  workflowId?: number | string
 }
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
@@ -133,7 +132,7 @@ const toDateOrUndefined = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-const buildSourceKey = (server: Pick<SyncableServer, 'slug'>, tableID: string) => `${server.slug}:${tableID}`
+const buildSourceKey = (server: Pick<SyncableServer, 'id'>, tableID: string) => `${server.id}:${tableID}`
 
 const buildRowSourceKey = ({
   rowID,
@@ -321,14 +320,14 @@ const getServersToSync = async (payload: Payload, serverID?: string) => {
   })
 
   const eligibleServers = result.docs.filter((server) => {
-    return Boolean(server.apiKey && server.baseURL && server.slug)
+    return Boolean(server.apiKey && server.baseURL)
   }) as SyncableServer[]
 
   if (eligibleServers.length === 0) {
     throw new Error(
       serverID
-        ? 'The selected server is missing one of the required sync fields: slug, baseURL, or apiKey.'
-        : 'No eligible servers found. Make sure at least one server has slug, baseURL, apiKey, and is not explicitly disabled.'
+        ? 'The selected server is missing one of the required sync fields: baseURL or apiKey.'
+        : 'No eligible servers found. Make sure at least one server has baseURL, apiKey, and is not explicitly disabled.'
     )
   }
 
@@ -377,7 +376,8 @@ const syncSingleTable = async ({
   server: SyncableServer
   table: N8nDataTable
 }) => {
-  const sourceKey = buildSourceKey(server, table.id)
+  const tableID = String(table.id)
+  const sourceKey = buildSourceKey(server, tableID)
   const now = new Date().toISOString()
   const existing = await payload.find({
     collection: 'data-tables',
@@ -393,7 +393,7 @@ const syncSingleTable = async ({
 
   const data = {
     columns: table.columns.map((column) => ({
-      columnID: column.id,
+      columnID: column.id == null ? undefined : String(column.id),
       displayName: column.name,
       index: column.index,
       key: column.name,
@@ -405,7 +405,7 @@ const syncSingleTable = async ({
     lastRefreshedAt: now,
     lastSeenAt: now,
     name: table.name,
-    projectID: table.projectId,
+    projectID: String(table.projectId),
     remoteCreatedAt: toDateOrUndefined(table.createdAt),
     remoteUpdatedAt: toDateOrUndefined(table.updatedAt),
     rowCount: rows.length,
@@ -413,8 +413,8 @@ const syncSingleTable = async ({
     server: server.id,
     slug: sourceKey,
     sourceKey,
-    sourcePath: `/data-tables/${table.id}`,
-    tableID: table.id,
+    sourcePath: `/data-tables/${tableID}`,
+    tableID,
   }
 
   let dataTableID: string
@@ -596,6 +596,135 @@ const findExistingDocBySourceKey = async ({
   return existing.docs[0]
 }
 
+const findExistingWorkflow = async ({
+  payload,
+  serverID,
+  sourceKey,
+  workflowID,
+}: {
+  payload: Payload
+  serverID: string
+  sourceKey: string
+  workflowID: string
+}) => {
+  const existingBySourceKey = await findExistingDocBySourceKey({
+    collection: 'workflows',
+    payload,
+    sourceKey,
+  })
+
+  if (existingBySourceKey) return existingBySourceKey
+
+  const existing = await payload.find({
+    collection: 'workflows',
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    where: {
+      and: [
+        {
+          server: {
+            equals: serverID,
+          },
+        },
+        {
+          workflowID: {
+            equals: workflowID,
+          },
+        },
+      ],
+    },
+  })
+
+  return existing.docs[0]
+}
+
+const findExistingCredential = async ({
+  credentialID,
+  payload,
+  serverID,
+  sourceKey,
+}: {
+  credentialID: string
+  payload: Payload
+  serverID: string
+  sourceKey: string
+}) => {
+  const existingBySourceKey = await findExistingDocBySourceKey({
+    collection: 'credentials',
+    payload,
+    sourceKey,
+  })
+
+  if (existingBySourceKey) return existingBySourceKey
+
+  const existing = await payload.find({
+    collection: 'credentials',
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    where: {
+      and: [
+        {
+          server: {
+            equals: serverID,
+          },
+        },
+        {
+          credentialID: {
+            equals: credentialID,
+          },
+        },
+      ],
+    },
+  })
+
+  return existing.docs[0]
+}
+
+const findExistingExecution = async ({
+  executionID,
+  payload,
+  serverID,
+  sourceKey,
+}: {
+  executionID: string
+  payload: Payload
+  serverID: string
+  sourceKey: string
+}) => {
+  const existingBySourceKey = await findExistingDocBySourceKey({
+    collection: 'executions',
+    payload,
+    sourceKey,
+  })
+
+  if (existingBySourceKey) return existingBySourceKey
+
+  const existing = await payload.find({
+    collection: 'executions',
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    where: {
+      and: [
+        {
+          server: {
+            equals: serverID,
+          },
+        },
+        {
+          executionID: {
+            equals: executionID,
+          },
+        },
+      ],
+    },
+  })
+
+  return existing.docs[0]
+}
+
 const getWorkflowMapForServer = async (payload: Payload, serverID: string) => {
   const result = await payload.find({
     collection: 'workflows',
@@ -629,13 +758,14 @@ const syncServerWorkflows = async ({
   })
 
   for (const workflow of workflows) {
-    const sourceKey = buildSourceKey(server, workflow.id)
+    const workflowID = String(workflow.id)
+    const sourceKey = buildSourceKey(server, workflowID)
     const data = {
       active: Boolean(workflow.active),
       apiData: workflow,
       lastSeenAt: new Date().toISOString(),
       name: workflow.name,
-      n8nURL: buildDashboardURL(server, `/workflow/${workflow.id}`),
+      n8nURL: buildDashboardURL(server, `/workflow/${workflowID}`),
       nodeCount: Array.isArray(workflow.nodes) ? workflow.nodes.length : undefined,
       projectID: getFirstProjectID(workflow.shared),
       remoteCreatedAt: toDateOrUndefined(workflow.createdAt),
@@ -647,13 +777,14 @@ const syncServerWorkflows = async ({
       tags: workflow.tags?.map((tag) => tag.name).filter((value): value is string => Boolean(value)),
       triggerCount: workflow.triggerCount,
       versionID: workflow.versionId,
-      workflowID: workflow.id,
+      workflowID,
     }
 
-    const existing = await findExistingDocBySourceKey({
-      collection: 'workflows',
+    const existing = await findExistingWorkflow({
       payload,
+      serverID: server.id,
       sourceKey,
+      workflowID,
     })
 
     if (existing) {
@@ -695,9 +826,10 @@ const syncServerCredentials = async ({
   })
 
   for (const credential of credentials) {
-    const sourceKey = buildSourceKey(server, credential.id)
+    const credentialID = String(credential.id)
+    const sourceKey = buildSourceKey(server, credentialID)
     const data = {
-      credentialID: credential.id,
+      credentialID,
       credentialType: credential.type,
       dataPreview: undefined,
       isGlobal: false,
@@ -713,9 +845,10 @@ const syncServerCredentials = async ({
       summary: summarizeCredentialSharing(credential),
     }
 
-    const existing = await findExistingDocBySourceKey({
-      collection: 'credentials',
+    const existing = await findExistingCredential({
+      credentialID,
       payload,
+      serverID: server.id,
       sourceKey,
     })
 
@@ -798,9 +931,10 @@ const syncServerExecutions = async ({
       workflow: relatedWorkflow?.id,
     }
 
-    const existing = await findExistingDocBySourceKey({
-      collection: 'executions',
+    const existing = await findExistingExecution({
+      executionID,
       payload,
+      serverID: server.id,
       sourceKey,
     })
 

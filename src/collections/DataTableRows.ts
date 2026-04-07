@@ -85,12 +85,13 @@ export const DataTableRows: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Optional stable key for sync-managed rows, for example "<server-slug>:<table-id>:<row-id>".',
+        description: 'Optional stable key for sync-managed rows, for example "<server-id>:<table-id>:<row-id>".',
       },
     },
     {
       name: 'rowID',
       type: 'text',
+      label: 'Row ID',
       index: true,
       admin: {
         description: 'Remote row identifier when available.',

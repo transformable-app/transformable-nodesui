@@ -60,5 +60,4 @@ export type N8nSyncTarget = {
   apiPath?: string | null
   baseURL: string
   serverID: string
-  serverSlug: string
 }
