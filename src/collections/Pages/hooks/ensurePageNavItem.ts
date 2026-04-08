@@ -12,6 +12,10 @@ export const ensurePageNavItem: CollectionAfterChangeHook<Page> = async ({
     return doc
   }
 
+  if (doc._status !== 'published' || !doc.title) {
+    return doc
+  }
+
   await ensurePageNavItemForHeader({
     page: doc,
     payload: req.payload,

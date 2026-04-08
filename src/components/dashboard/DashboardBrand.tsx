@@ -8,6 +8,7 @@ type DashboardBrandProps = {
   title: string
   subtitle?: string | null
   compact?: boolean
+  collapsed?: boolean
 }
 
 export function DashboardBrand({
@@ -16,12 +17,18 @@ export function DashboardBrand({
   title,
   subtitle,
   compact = false,
+  collapsed = false,
 }: DashboardBrandProps) {
   const iconSizeClass = compact ? 'h-10 w-10' : 'h-12 w-12'
   const imageSizeClass = compact ? 'h-7 w-7' : 'h-8 w-8'
 
   return (
-    <Link className="flex min-w-0 items-center gap-3" href={href}>
+    <Link
+      aria-label={title}
+      className={`flex min-w-0 items-center ${collapsed ? 'justify-center' : 'gap-3'}`}
+      href={href}
+      title={collapsed ? title : undefined}
+    >
       <div
         className={`flex ${iconSizeClass} shrink-0 items-center justify-center rounded-lg border bg-background text-foreground`}
       >
@@ -32,14 +39,16 @@ export function DashboardBrand({
           <LayoutDashboard className="h-5 w-5 text-primary" />
         )}
       </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-foreground">{title}</p>
-        {subtitle ? (
-          <p className="truncate text-xs uppercase tracking-[0.22em] text-muted-foreground">
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
+      {!collapsed ? (
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-foreground">{title}</p>
+          {subtitle ? (
+            <p className="truncate text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </Link>
   )
 }

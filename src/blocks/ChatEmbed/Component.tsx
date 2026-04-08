@@ -28,7 +28,7 @@ export function ChatEmbedBlock({ description, embedURL, height = 560, provider, 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+          <div className="overflow-hidden bg-slate-900">
             <iframe
               className="w-full"
               height={height ?? 560}

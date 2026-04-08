@@ -477,6 +477,9 @@ export interface ChatEmbedBlock {
   title: string;
   description?: string | null;
   provider?: string | null;
+  /**
+   * For an n8n chat, enable "Make Chat Publicly Available", set Mode to "Hosted Chat", and copy the Chat URL.
+   */
   embedURL: string;
   height: number;
   id?: string | null;

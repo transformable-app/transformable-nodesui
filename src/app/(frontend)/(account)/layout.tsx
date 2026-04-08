@@ -8,11 +8,13 @@ import { AccountNav } from '@/components/AccountNav'
 import { CMSLink } from '@/components/Link'
 import { ThemeSelector } from '@/providers/Theme/ThemeSelector'
 import { DashboardBrand } from '@/components/dashboard/DashboardBrand'
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { getLatestSyncAt } from '@/components/dashboard/getLatestSyncAt'
 import { getCachedGlobal } from '@/utilities/getGlobals'
 import type { Header as HeaderType } from '@/payload-types'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
-import { ArrowRight } from 'lucide-react'
 import { cn } from '@/utilities/ui'
+import { formatDateTime } from '@/n8n/format'
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const headers = await getHeaders()
@@ -21,6 +23,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     payload.auth({ headers }),
     getCachedGlobal('header', 1)(),
   ])
+  const lastSyncAt = await getLatestSyncAt({ payload, user })
   const headerData = headerDataResult as HeaderType
   const logo =
     headerData?.logo && typeof headerData.logo === 'object' && 'url' in headerData.logo
@@ -32,6 +35,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const navItems = (headerData.navItems || []).filter((item): item is NonNullable<typeof item> =>
     Boolean(item?.link),
   )
+  const accountLinks = [
+    { href: '/account', label: 'Account' },
+    { href: '/logout', label: 'Log out' },
+  ]
 
   return (
     <article className="pb-8 pt-4 sm:pb-12 sm:pt-6">
@@ -42,46 +49,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
         <div className={cn('flex flex-col gap-6', user && !hideDashboardSidebar && 'lg:flex-row')}>
           {user && !hideDashboardSidebar ? (
-            <aside className="hidden lg:flex lg:w-[290px] lg:shrink-0 lg:flex-col">
-              <div className="sticky top-6 overflow-hidden rounded-xl border bg-card shadow">
-                <div className="border-b p-6">
-                  <DashboardBrand logo={logo} subtitle={sidebarText} title={sidebarLabel} />
-                </div>
-
-                <div className="p-4">
-                  <nav className="flex flex-col gap-1">
-                    {navItems.map(({ link }, index) =>
-                      link ? (
-                        <CMSLink
-                          key={`${link.label || 'account-nav'}-${index}`}
-                          {...link}
-                          appearance="inline"
-                          className="group flex items-center justify-between rounded-lg border border-transparent px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                        >
-                          <span className="text-muted-foreground transition group-hover:text-primary">
-                            <ArrowRight className="h-4 w-4" />
-                          </span>
-                        </CMSLink>
-                      ) : null,
-                    )}
-                  </nav>
-                </div>
-
-                <div className="border-t p-4">
-                  <AccountNav />
-                </div>
-
-                <div className="border-t p-4">
-                  <div className="flex items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Color mode</p>
-                      <p className="text-xs text-muted-foreground">Light or dark theme</p>
-                    </div>
-                    <ThemeSelector />
-                  </div>
-                </div>
-              </div>
-            </aside>
+            <DashboardSidebar
+              accountLinks={accountLinks}
+              lastSyncLabel={formatDateTime(lastSyncAt)}
+              logo={logo}
+              navItems={navItems}
+              subtitle={sidebarText}
+              title={sidebarLabel}
+            />
           ) : null}
 
           <div className="min-w-0 flex-1 space-y-6 lg:-mt-6">

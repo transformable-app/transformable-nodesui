@@ -168,6 +168,7 @@ export const Pages: CollectionConfig<'pages'> = {
         interval: 100, // We set this interval for optimal live preview
       },
       schedulePublish: true,
+      validate: false,
     },
     maxPerDoc: 50,
   },

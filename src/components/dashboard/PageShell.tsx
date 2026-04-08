@@ -5,10 +5,13 @@ import { getPayload } from 'payload'
 
 import { DashboardNav } from '@/components/dashboard/DashboardNav'
 import { DashboardBrand } from '@/components/dashboard/DashboardBrand'
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { getLatestSyncAt } from '@/components/dashboard/getLatestSyncAt'
 import { ThemeSelector } from '@/providers/Theme/ThemeSelector'
 import type { Header as HeaderType } from '@/payload-types'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
 import { cn } from '@/utilities/ui'
+import { formatDateTime } from '@/n8n/format'
 
 type NavItems = NonNullable<HeaderType['navItems']>
 
@@ -24,6 +27,7 @@ export async function DashboardPageShell({
   const headers = await getHeaders()
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers })
+  const lastSyncAt = await getLatestSyncAt({ payload, user })
   const logo =
     headerData?.logo && typeof headerData.logo === 'object' && 'url' in headerData.logo
       ? getMediaUrl(headerData.logo.url as string)
@@ -43,33 +47,14 @@ export async function DashboardPageShell({
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 sm:px-6 lg:px-8">
         <div className={cn('flex flex-col gap-6', !hideDashboardSidebar && 'lg:flex-row')}>
           {!hideDashboardSidebar ? (
-            <aside className="hidden lg:flex lg:w-[290px] lg:shrink-0 lg:flex-col">
-              <div className="sticky top-6 overflow-hidden rounded-xl border bg-card shadow">
-                <div className="border-b p-6">
-                  <DashboardBrand logo={logo} subtitle={sidebarText} title={sidebarLabel} />
-                </div>
-
-                <nav className="flex flex-col gap-1 p-4">
-                  <DashboardNav accountLinks={[]} navItems={navItems} />
-                  {accountLinks.length > 0 ? (
-                    <>
-                      <div className="my-2 border-t" />
-                      <DashboardNav accountLinks={accountLinks} navItems={[]} />
-                    </>
-                  ) : null}
-                </nav>
-
-                <div className="border-t p-4">
-                  <div className="flex items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Color mode</p>
-                      <p className="text-xs text-muted-foreground">Light or dark theme</p>
-                    </div>
-                    <ThemeSelector />
-                  </div>
-                </div>
-              </div>
-            </aside>
+            <DashboardSidebar
+              accountLinks={accountLinks}
+              lastSyncLabel={formatDateTime(lastSyncAt)}
+              logo={logo}
+              navItems={navItems}
+              subtitle={sidebarText}
+              title={sidebarLabel}
+            />
           ) : null}
 
           <div className="min-w-0 flex-1 space-y-6 lg:-mt-6">

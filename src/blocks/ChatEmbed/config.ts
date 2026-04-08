@@ -24,6 +24,10 @@ export const ChatEmbedBlock: Block = {
       type: 'text',
       label: 'Embed URL',
       required: true,
+      admin: {
+        description:
+          'For an n8n chat, enable "Make Chat Publicly Available", set Mode to "Hosted Chat", and copy the Chat URL.',
+      },
     },
     {
       name: 'height',
