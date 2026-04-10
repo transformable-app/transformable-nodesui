@@ -23,6 +23,8 @@ RUN \
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+ARG PAYLOAD_SECRET=build-secret-not-for-runtime
+ENV PAYLOAD_SECRET=${PAYLOAD_SECRET}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -42,9 +44,9 @@ RUN \
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 ENV PAYLOAD_JOBS_AUTORUN=true
-ENV PAYLOAD_JOBS_AUTORUN_CRON="* * * * *"
+ENV PAYLOAD_JOBS_AUTORUN_CRON=* * * * *
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
 
@@ -67,8 +69,8 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD HOSTNAME="0.0.0.0" node server.js
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 node server.js"]
