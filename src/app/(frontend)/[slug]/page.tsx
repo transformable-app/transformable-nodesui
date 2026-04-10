@@ -18,29 +18,7 @@ import { getCachedGlobal } from '@/utilities/getGlobals'
 const getLoginRedirect = (path: string) =>
   `/login?warning=${encodeURIComponent('Please login to view this dashboard.')}&redirect=${encodeURIComponent(path)}`
 
-export async function generateStaticParams() {
-  const payload = await getPayload({ config: configPromise })
-  const pages = await payload.find({
-    collection: 'pages',
-    draft: false,
-    limit: 1000,
-    overrideAccess: false,
-    pagination: false,
-    select: {
-      slug: true,
-    },
-  })
-
-  const params = pages.docs
-    ?.filter((doc) => {
-      return doc.slug !== 'home'
-    })
-    .map(({ slug }) => {
-      return { slug }
-    })
-
-  return params
-}
+export const dynamic = 'force-dynamic'
 
 type Args = {
   params: Promise<{

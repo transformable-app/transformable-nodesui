@@ -16,6 +16,8 @@ import { getCachedGlobal } from '@/utilities/getGlobals'
 
 import PageClient from './[slug]/page.client'
 
+export const dynamic = 'force-dynamic'
+
 type HomePageArgs = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }

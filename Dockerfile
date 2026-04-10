@@ -23,8 +23,6 @@ RUN \
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
-ARG PAYLOAD_SECRET=build-secret-not-for-runtime
-ENV PAYLOAD_SECRET=${PAYLOAD_SECRET}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
