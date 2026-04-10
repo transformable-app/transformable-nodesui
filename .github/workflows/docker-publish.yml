@@ -14,7 +14,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: transformable-app/nuipayload
+  IMAGE_NAME: transformable-app/transformable-nodesui
 
 jobs:
   build:
