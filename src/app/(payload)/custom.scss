@@ -1,0 +1,23 @@
+.admin-github-link {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--theme-text);
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  opacity: 0.75;
+  transition:
+    background-color 120ms ease,
+    opacity 120ms ease;
+  width: 32px;
+
+  &:focus-visible,
+  &:hover {
+    background-color: var(--theme-elevation-100);
+    opacity: 1;
+  }
+
+  svg {
+    display: block;
+  }
+}

@@ -1,9 +1,9 @@
 {
-  "name": "payload",
+  "name": "transformable-nodesui",
   "version": "1.0.0",
   "description": "Website template for Payload",
   "license": "MIT",
-  "source": "https://github.com/transformable-app/nuipayload",
+  "source": "https://github.com/transformable-app/transformable-nodesui",
   "type": "module",
   "packageManager": "pnpm@10.25.0",
   "scripts": {

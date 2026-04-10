@@ -40,6 +40,7 @@ export default buildConfig({
       ],
     },
     components: {
+      actions: ['@/components/Admin/GitHubAction'],
       graphics: {
         Icon: '@/components/AdminIcon',
         Logo: '@/components/AdminLogo',

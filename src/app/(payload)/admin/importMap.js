@@ -22,6 +22,7 @@ import { default as default_e6080cf2a6380ab220552afd73667312 } from '@/component
 import { RowLabel as RowLabel_ec255a65fa6fa8d1faeb09cf35284224 } from '@/Header/RowLabel'
 import { default as default_c1363893506d7ed29a71d1a4da01ddb5 } from '@/components/AdminIcon'
 import { default as default_aa0a2d19d38a4839dbd373417e210b89 } from '@/components/AdminLogo'
+import { default as default_19b8e83f94aae0e75357868f5953e6e4 } from '@/components/Admin/GitHubAction'
 import { default as default_1a7510af427896d367a49dbf838d2de6 } from '@/components/BeforeDashboard'
 import { default as default_8a7ab0eb7ab5c511aba12e68480bfe5e } from '@/components/BeforeLogin'
 import { AdminSettingsRefreshProvider as AdminSettingsRefreshProvider_dbbd7027b45520f054c44e2ae75eb83f } from '@/components/AdminSettingsRefresh'
@@ -53,6 +54,7 @@ export const importMap = {
   "@/Header/RowLabel#RowLabel": RowLabel_ec255a65fa6fa8d1faeb09cf35284224,
   "@/components/AdminIcon#default": default_c1363893506d7ed29a71d1a4da01ddb5,
   "@/components/AdminLogo#default": default_aa0a2d19d38a4839dbd373417e210b89,
+  "@/components/Admin/GitHubAction#default": default_19b8e83f94aae0e75357868f5953e6e4,
   "@/components/BeforeDashboard#default": default_1a7510af427896d367a49dbf838d2de6,
   "@/components/BeforeLogin#default": default_8a7ab0eb7ab5c511aba12e68480bfe5e,
   "@/components/AdminSettingsRefresh#AdminSettingsRefreshProvider": AdminSettingsRefreshProvider_dbbd7027b45520f054c44e2ae75eb83f,

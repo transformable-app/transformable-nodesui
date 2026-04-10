@@ -113,6 +113,7 @@ export const Executions: CollectionConfig = {
     {
       name: 'durationMS',
       type: 'number',
+      label: 'Duration MS',
       min: 0,
     },
     {

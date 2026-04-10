@@ -1,14 +1,14 @@
 services:
   app:
-    image: ${NUIPAYLOAD_IMAGE:-ghcr.io/transformable-app/nuipayload:latest}
+    image: ${TRANSFORMABLE_NODESUI_IMAGE:-ghcr.io/transformable-app/transformable-nodesui:latest}
     restart: unless-stopped
     depends_on:
       - mongo
     ports:
-      - '${NUIPAYLOAD_PORT:-3000}:3000'
+      - '${TRANSFORMABLE_NODESUI_PORT:-3000}:3000'
     environment:
       NODE_ENV: production
-      DATABASE_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-nuipayload}:${MONGO_INITDB_ROOT_PASSWORD:-change-me}@mongo:27017/${MONGO_DATABASE:-nuipayload}?authSource=admin
+      DATABASE_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-transformable-nodesui}:${MONGO_INITDB_ROOT_PASSWORD:-change-me}@mongo:27017/${MONGO_DATABASE:-transformable-nodesui}?authSource=admin
       PAYLOAD_SECRET: ${PAYLOAD_SECRET:?set PAYLOAD_SECRET}
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?set NEXT_PUBLIC_SERVER_URL}
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
@@ -28,9 +28,9 @@ services:
       - --bind_ip_all
       - --storageEngine=wiredTiger
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-nuipayload}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-transformable-nodesui}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change-me}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-nuipayload}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-transformable-nodesui}
     volumes:
       - mongo_data:/data/db
 

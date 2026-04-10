@@ -1,6 +1,6 @@
 import type { Payload, Where } from 'payload'
 
-import type { Server } from '@/payload-types'
+import type { DataTable, Server } from '@/payload-types'
 
 type SyncableServer = Pick<
   Server,
@@ -34,7 +34,7 @@ type N8nDataTable = {
 }
 
 type N8nDataTableRow = Record<string, unknown> & {
-  id?: number
+  id?: number | string
   createdAt?: string
   updatedAt?: string
 }
@@ -139,10 +139,110 @@ const buildRowSourceKey = ({
   rowIndex,
   tableSourceKey,
 }: {
-  rowID?: number
+  rowID?: number | string
   rowIndex: number
   tableSourceKey: string
-}) => `${tableSourceKey}:${typeof rowID === 'number' ? rowID : `index-${rowIndex}`}`
+}) => `${tableSourceKey}:${rowID != null && rowID !== '' ? String(rowID) : `index-${rowIndex}`}`
+
+const normalizeRowID = (rowID: N8nDataTableRow['id']) =>
+  rowID != null && rowID !== '' ? String(rowID) : undefined
+
+const getRelationID = (value: DataTable['server']) =>
+  typeof value === 'string' ? value : value.id
+
+const findExistingDataTables = async ({
+  payload,
+  server,
+  sourceKey,
+  tableID,
+}: {
+  payload: Payload
+  server: SyncableServer
+  sourceKey: string
+  tableID: string
+}) => {
+  const result = await payload.find({
+    collection: 'data-tables',
+    depth: 0,
+    limit: 100,
+    pagination: false,
+    sort: 'createdAt',
+    where: {
+      or: [
+        {
+          sourceKey: {
+            equals: sourceKey,
+          },
+        },
+        {
+          and: [
+            {
+              server: {
+                equals: server.id,
+              },
+            },
+            {
+              tableID: {
+                equals: tableID,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  return result.docs.filter(
+    (doc) => getRelationID(doc.server) === server.id && doc.tableID === tableID,
+  )
+}
+
+const deleteDataTableMirror = async ({
+  payload,
+  tableID,
+}: {
+  payload: Payload
+  tableID: string
+}) => {
+  await payload.delete({
+    collection: 'data-table-rows',
+    context: {
+      skipTableRowCountSync: true,
+    },
+    where: {
+      table: {
+        equals: tableID,
+      },
+    },
+  })
+
+  await payload.delete({
+    collection: 'data-tables',
+    id: tableID,
+  })
+}
+
+const getExistingRowsForTable = async ({
+  payload,
+  tableID,
+}: {
+  payload: Payload
+  tableID: string
+}) => {
+  const existing = await payload.find({
+    collection: 'data-table-rows',
+    depth: 0,
+    limit: 10000,
+    pagination: false,
+    where: {
+      table: {
+        equals: tableID,
+      },
+    },
+  })
+
+  return existing.docs
+}
 
 const normalizeExecutionStatus = (status?: N8nExecution['status']) => {
   switch (status) {
@@ -379,16 +479,11 @@ const syncSingleTable = async ({
   const tableID = String(table.id)
   const sourceKey = buildSourceKey(server, tableID)
   const now = new Date().toISOString()
-  const existing = await payload.find({
-    collection: 'data-tables',
-    depth: 0,
-    limit: 1,
-    pagination: false,
-    where: {
-      sourceKey: {
-        equals: sourceKey,
-      },
-    },
+  const existingTables = await findExistingDataTables({
+    payload,
+    server,
+    sourceKey,
+    tableID,
   })
 
   const data = {
@@ -419,10 +514,19 @@ const syncSingleTable = async ({
 
   let dataTableID: string
 
-  if (existing.docs[0]) {
+  if (existingTables[0]) {
+    const [canonicalTable, ...duplicateTables] = existingTables
+
+    for (const duplicateTable of duplicateTables) {
+      await deleteDataTableMirror({
+        payload,
+        tableID: duplicateTable.id,
+      })
+    }
+
     const updated = await payload.update({
       collection: 'data-tables',
-      id: existing.docs[0].id,
+      id: canonicalTable.id,
       data,
     })
     dataTableID = updated.id
@@ -436,44 +540,73 @@ const syncSingleTable = async ({
     dataTableID = created.id
   }
 
-  await payload.delete({
-    collection: 'data-table-rows',
-    context: {
-      skipTableRowCountSync: true,
-    },
-    where: {
-      table: {
-        equals: dataTableID,
-      },
-    },
+  const existingRows = await getExistingRowsForTable({
+    payload,
+    tableID: dataTableID,
   })
+  const existingRowsBySourceKey = new Map(
+    existingRows.flatMap((existingRow) =>
+      existingRow.sourceKey ? [[existingRow.sourceKey, existingRow] as const] : [],
+    ),
+  )
+  const seenRowSourceKeys = new Set<string>()
 
   for (const [rowIndex, row] of rows.entries()) {
     const columnData = table.columns.reduce<Record<string, unknown>>((acc, column) => {
       acc[column.name] = row[column.name] ?? null
       return acc
     }, {})
+    const rowID = normalizeRowID(row.id)
+    const rowSourceKey = buildRowSourceKey({
+      rowID: row.id,
+      rowIndex,
+      tableSourceKey: sourceKey,
+    })
+    const rowData = {
+      data: columnData,
+      lastSeenAt: now,
+      remoteCreatedAt: toDateOrUndefined(row.createdAt),
+      remoteUpdatedAt: toDateOrUndefined(row.updatedAt),
+      rowID,
+      rowIndex,
+      sourceKey: rowSourceKey,
+      table: dataTableID,
+    }
+    const existingRow = existingRowsBySourceKey.get(rowSourceKey)
+
+    seenRowSourceKeys.add(rowSourceKey)
+
+    if (existingRow) {
+      await payload.update({
+        collection: 'data-table-rows',
+        context: {
+          skipTableRowCountSync: true,
+        },
+        data: rowData,
+        id: existingRow.id,
+      })
+      continue
+    }
 
     await payload.create({
       collection: 'data-table-rows',
       context: {
         skipTableRowCountSync: true,
       },
-      data: {
-        data: columnData,
-        lastSeenAt: now,
-        remoteCreatedAt: toDateOrUndefined(row.createdAt),
-        remoteUpdatedAt: toDateOrUndefined(row.updatedAt),
-        rowID: typeof row.id === 'number' ? String(row.id) : undefined,
-        rowIndex,
-        sourceKey: buildRowSourceKey({
-          rowID: row.id,
-          rowIndex,
-          tableSourceKey: sourceKey,
-        }),
-        table: dataTableID,
-      },
+      data: rowData,
       draft: false,
+    })
+  }
+
+  for (const existingRow of existingRows) {
+    if (!existingRow.sourceKey || seenRowSourceKeys.has(existingRow.sourceKey)) continue
+
+    await payload.delete({
+      collection: 'data-table-rows',
+      context: {
+        skipTableRowCountSync: true,
+      },
+      id: existingRow.id,
     })
   }
 }
