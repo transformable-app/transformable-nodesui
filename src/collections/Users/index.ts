@@ -17,6 +17,8 @@ const getRoleID = (value: unknown): string | null => {
   return null
 }
 
+const ADMIN_ROLE_NAME = 'Admin'
+
 export const Users: CollectionConfig = {
   slug: 'users',
   access: {
@@ -37,8 +39,40 @@ export const Users: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      async ({ data, originalDoc, req }) => {
+      async ({ data, operation, originalDoc, req }) => {
         const nextData = data ?? {}
+
+        if (operation === 'create') {
+          const existingUsers = await req.payload.find({
+            collection: 'users',
+            depth: 0,
+            limit: 1,
+            overrideAccess: true,
+            req,
+          })
+
+          if (existingUsers.totalDocs === 0) {
+            const existingAdminRole = await req.payload.find({
+              collection: 'roles',
+              depth: 0,
+              limit: 1,
+              overrideAccess: true,
+              req,
+              where: {
+                name: {
+                  equals: ADMIN_ROLE_NAME,
+                },
+              },
+            })
+
+            const adminRole = existingAdminRole.docs[0]
+
+            if (adminRole) {
+              nextData.roles = [adminRole.id]
+            }
+          }
+        }
+
         const roleValues = Array.isArray(nextData.roles)
           ? nextData.roles
           : Array.isArray(originalDoc?.roles)
@@ -87,6 +121,7 @@ export const Users: CollectionConfig = {
       saveToJWT: true,
       admin: {
         description: 'Assign one or more roles to this user.',
+        condition: (_, __, { user }) => Boolean(user),
       },
     },
     {
