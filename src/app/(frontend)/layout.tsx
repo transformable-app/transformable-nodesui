@@ -18,6 +18,7 @@ import configPromise from '@payload-config'
 import './globals.css'
 import { getServerSideURL } from '@/utilities/getURL'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
+import { renderHeadHTML } from '@/utilities/renderHeadHTML'
 import type { Header as HeaderType } from '@/payload-types'
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const showAdminBar = checkRole(['Admin'], user)
 
   const metaTags = headerData?.metaTags || null
+  const headerScripts = headerData?.headerScripts || null
 
   // Get favicon URL from Header global or fall back to default
   const favicon =
@@ -77,7 +79,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </>
         )}
         {appleTouchIcon && <link href={appleTouchIcon} rel="apple-touch-icon" />}
-        {metaTags && <div dangerouslySetInnerHTML={{ __html: metaTags }} />}
+        {renderHeadHTML(metaTags)}
+        {renderHeadHTML(headerScripts)}
       </head>
       <body className="bg-background text-foreground">
         <Providers>
