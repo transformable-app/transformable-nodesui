@@ -32,9 +32,9 @@ export const canReadDashboard = ({
   user?: User | null
 }): boolean => {
   if (page._status !== 'published') return false
-  if (user && checkRole(['Admin'], user)) return true
-  if (!page.requiredRole) return true
   if (!user) return false
+  if (checkRole(['Admin'], user)) return true
+  if (!page.requiredRole) return true
 
   const requiredRoleID = getRequiredRoleID(page.requiredRole)
   if (!requiredRoleID) return false
