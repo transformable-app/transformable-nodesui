@@ -82,7 +82,7 @@ const queryHomePage = cache(async () => {
 
   const result = await payload.find({
     collection: 'pages',
-    depth: 3,
+    depth: 0,
     draft,
     limit: 1,
     pagination: false,

@@ -142,6 +142,17 @@ const getRequestPayload = async () => {
   return { payload, user }
 }
 
+const isAccessDeniedError = (error: unknown): error is { status?: number } =>
+  Boolean(error && typeof error === 'object' && 'status' in error && error.status === 403)
+
+const returnIfAccessDenied = <T>(error: unknown, fallback: T): T => {
+  if (isAccessDeniedError(error)) {
+    return fallback
+  }
+
+  throw error
+}
+
 export const getRelationName = (value?: string | RelationDoc | null) => {
   if (!value) return 'Unassigned'
   if (typeof value === 'string') return value
@@ -168,41 +179,49 @@ export const getServers = async ({ limit, statuses }: { limit: number; statuses?
         }
       : undefined
 
-  const result = await payload.find({
-    collection: 'servers',
-    depth: 0,
-    limit,
-    overrideAccess: false,
-    pagination: false,
-    sort: 'name',
-    user,
-    where,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'servers',
+      depth: 0,
+      limit,
+      overrideAccess: false,
+      pagination: false,
+      sort: 'name',
+      user,
+      where,
+    })
 
-  return result.docs as ServerCard[]
+    return result.docs as ServerCard[]
+  } catch (error) {
+    return returnIfAccessDenied(error, [] as ServerCard[])
+  }
 }
 
 export const getWorkflows = async ({ limit, serverID }: { limit: number; serverID?: string }) => {
   const { payload, user } = await getRequestPayload()
 
-  const result = await payload.find({
-    collection: 'workflows',
-    depth: 1,
-    limit,
-    overrideAccess: false,
-    pagination: false,
-    sort: '-remoteUpdatedAt',
-    user,
-    where: serverID
-      ? {
-          server: {
-            equals: serverID,
-          },
-        }
-      : undefined,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'workflows',
+      depth: 1,
+      limit,
+      overrideAccess: false,
+      pagination: false,
+      sort: '-remoteUpdatedAt',
+      user,
+      where: serverID
+        ? {
+            server: {
+              equals: serverID,
+            },
+          }
+        : undefined,
+    })
 
-  return result.docs as WorkflowCard[]
+    return result.docs as WorkflowCard[]
+  } catch (error) {
+    return returnIfAccessDenied(error, [] as WorkflowCard[])
+  }
 }
 
 export const getPaginatedWorkflows = async ({
@@ -216,30 +235,39 @@ export const getPaginatedWorkflows = async ({
 }) => {
   const { payload, user } = await getRequestPayload()
 
-  const result = await payload.find({
-    collection: 'workflows',
-    depth: 1,
-    limit,
-    overrideAccess: false,
-    page,
-    pagination: true,
-    sort: '-remoteUpdatedAt',
-    user,
-    where: serverID
-      ? {
-          server: {
-            equals: serverID,
-          },
-        }
-      : undefined,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'workflows',
+      depth: 1,
+      limit,
+      overrideAccess: false,
+      page,
+      pagination: true,
+      sort: '-remoteUpdatedAt',
+      user,
+      where: serverID
+        ? {
+            server: {
+              equals: serverID,
+            },
+          }
+        : undefined,
+    })
 
-  return {
-    docs: result.docs as WorkflowCard[],
-    page: result.page,
-    totalDocs: result.totalDocs,
-    totalPages: result.totalPages,
-  } as PaginatedWorkflows
+    return {
+      docs: result.docs as WorkflowCard[],
+      page: result.page,
+      totalDocs: result.totalDocs,
+      totalPages: result.totalPages,
+    } as PaginatedWorkflows
+  } catch (error) {
+    return returnIfAccessDenied(error, {
+      docs: [],
+      page,
+      totalDocs: 0,
+      totalPages: 1,
+    } as PaginatedWorkflows)
+  }
 }
 
 export const getExecutions = async ({
@@ -281,18 +309,22 @@ export const getExecutions = async ({
     })
   }
 
-  const result = await payload.find({
-    collection: 'executions',
-    depth: 1,
-    limit,
-    overrideAccess: false,
-    pagination: false,
-    sort: '-startedAt',
-    user,
-    where: and.length > 0 ? { and } : undefined,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'executions',
+      depth: 1,
+      limit,
+      overrideAccess: false,
+      pagination: false,
+      sort: '-startedAt',
+      user,
+      where: and.length > 0 ? { and } : undefined,
+    })
 
-  return result.docs as ExecutionCard[]
+    return result.docs as ExecutionCard[]
+  } catch (error) {
+    return returnIfAccessDenied(error, [] as ExecutionCard[])
+  }
 }
 
 export const getPaginatedExecutions = async ({
@@ -336,24 +368,33 @@ export const getPaginatedExecutions = async ({
     })
   }
 
-  const result = await payload.find({
-    collection: 'executions',
-    depth: 1,
-    limit,
-    overrideAccess: false,
-    page,
-    pagination: true,
-    sort: '-startedAt',
-    user,
-    where: and.length > 0 ? { and } : undefined,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'executions',
+      depth: 1,
+      limit,
+      overrideAccess: false,
+      page,
+      pagination: true,
+      sort: '-startedAt',
+      user,
+      where: and.length > 0 ? { and } : undefined,
+    })
 
-  return {
-    docs: result.docs as ExecutionCard[],
-    page: result.page,
-    totalDocs: result.totalDocs,
-    totalPages: result.totalPages,
-  } as PaginatedExecutions
+    return {
+      docs: result.docs as ExecutionCard[],
+      page: result.page,
+      totalDocs: result.totalDocs,
+      totalPages: result.totalPages,
+    } as PaginatedExecutions
+  } catch (error) {
+    return returnIfAccessDenied(error, {
+      docs: [],
+      page,
+      totalDocs: 0,
+      totalPages: 1,
+    } as PaginatedExecutions)
+  }
 }
 
 export const getCredentials = async ({
@@ -385,18 +426,22 @@ export const getCredentials = async ({
     })
   }
 
-  const result = await payload.find({
-    collection: 'credentials',
-    depth: 1,
-    limit,
-    overrideAccess: false,
-    pagination: false,
-    sort: '-remoteUpdatedAt',
-    user,
-    where: and.length > 0 ? { and } : undefined,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'credentials',
+      depth: 1,
+      limit,
+      overrideAccess: false,
+      pagination: false,
+      sort: '-remoteUpdatedAt',
+      user,
+      where: and.length > 0 ? { and } : undefined,
+    })
 
-  return result.docs as CredentialCard[]
+    return result.docs as CredentialCard[]
+  } catch (error) {
+    return returnIfAccessDenied(error, [] as CredentialCard[])
+  }
 }
 
 export const getPaginatedCredentials = async ({
@@ -430,38 +475,51 @@ export const getPaginatedCredentials = async ({
     })
   }
 
-  const result = await payload.find({
-    collection: 'credentials',
-    depth: 1,
-    limit,
-    overrideAccess: false,
-    page,
-    pagination: true,
-    sort: '-remoteUpdatedAt',
-    user,
-    where: and.length > 0 ? { and } : undefined,
-  })
+  try {
+    const result = await payload.find({
+      collection: 'credentials',
+      depth: 1,
+      limit,
+      overrideAccess: false,
+      page,
+      pagination: true,
+      sort: '-remoteUpdatedAt',
+      user,
+      where: and.length > 0 ? { and } : undefined,
+    })
 
-  return {
-    docs: result.docs as CredentialCard[],
-    page: result.page,
-    totalDocs: result.totalDocs,
-    totalPages: result.totalPages,
-  } as PaginatedCredentials
+    return {
+      docs: result.docs as CredentialCard[],
+      page: result.page,
+      totalDocs: result.totalDocs,
+      totalPages: result.totalPages,
+    } as PaginatedCredentials
+  } catch (error) {
+    return returnIfAccessDenied(error, {
+      docs: [],
+      page,
+      totalDocs: 0,
+      totalPages: 1,
+    } as PaginatedCredentials)
+  }
 }
 
 export const getDataTableByID = async (id: string) => {
   const { payload, user } = await getRequestPayload()
 
-  const doc = await payload.findByID({
-    collection: 'data-tables',
-    depth: 1,
-    id,
-    overrideAccess: false,
-    user,
-  })
+  try {
+    const doc = await payload.findByID({
+      collection: 'data-tables',
+      depth: 1,
+      id,
+      overrideAccess: false,
+      user,
+    })
 
-  return doc as DataTableDoc
+    return doc as DataTableDoc
+  } catch (error) {
+    return returnIfAccessDenied(error, null as DataTableDoc | null)
+  }
 }
 
 export const getDataTableRows = async ({
@@ -477,28 +535,37 @@ export const getDataTableRows = async ({
 }) => {
   const { payload, user } = await getRequestPayload()
 
-  const result = await payload.find({
-    collection: 'data-table-rows',
-    depth: 0,
-    limit,
-    page,
-    overrideAccess: false,
-    pagination: true,
-    sort: resolveDataTableRowSort(sort),
-    user,
-    where: {
-      table: {
-        equals: tableID,
+  try {
+    const result = await payload.find({
+      collection: 'data-table-rows',
+      depth: 0,
+      limit,
+      page,
+      overrideAccess: false,
+      pagination: true,
+      sort: resolveDataTableRowSort(sort),
+      user,
+      where: {
+        table: {
+          equals: tableID,
+        },
       },
-    },
-  })
+    })
 
-  return {
-    docs: result.docs as DataTableRowDoc[],
-    page: result.page,
-    totalDocs: result.totalDocs,
-    totalPages: result.totalPages,
-  } as PaginatedDataTableRows
+    return {
+      docs: result.docs as DataTableRowDoc[],
+      page: result.page,
+      totalDocs: result.totalDocs,
+      totalPages: result.totalPages,
+    } as PaginatedDataTableRows
+  } catch (error) {
+    return returnIfAccessDenied(error, {
+      docs: [],
+      page: page ?? 1,
+      totalDocs: 0,
+      totalPages: 1,
+    } as PaginatedDataTableRows)
+  }
 }
 
 export const getAllDataTableRows = async ({
@@ -510,19 +577,23 @@ export const getAllDataTableRows = async ({
 }) => {
   const { payload, user } = await getRequestPayload()
 
-  const result = await payload.find({
-    collection: 'data-table-rows',
-    depth: 0,
-    overrideAccess: false,
-    pagination: false,
-    sort: resolveDataTableRowSort(sort),
-    user,
-    where: {
-      table: {
-        equals: tableID,
+  try {
+    const result = await payload.find({
+      collection: 'data-table-rows',
+      depth: 0,
+      overrideAccess: false,
+      pagination: false,
+      sort: resolveDataTableRowSort(sort),
+      user,
+      where: {
+        table: {
+          equals: tableID,
+        },
       },
-    },
-  })
+    })
 
-  return result.docs as DataTableRowDoc[]
+    return result.docs as DataTableRowDoc[]
+  } catch (error) {
+    return returnIfAccessDenied(error, [] as DataTableRowDoc[])
+  }
 }

@@ -268,6 +268,8 @@ export async function DataTableViewerBlock({
   if (!tableID) return null
 
   const dataTable = await getDataTableByID(tableID)
+  if (!dataTable) return null
+
   const columns = (dataTable.columns || []) as DataTableColumn[]
   const blockID = id || tableID
   const queryParam = `tablePage-${blockID}`
