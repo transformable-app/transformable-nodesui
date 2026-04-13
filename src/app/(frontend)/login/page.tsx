@@ -35,7 +35,7 @@ export default async function Login() {
       ? getMediaUrl(headerData.logo.url as string)
       : null
   const sidebarLabel = headerData.dashboardSidebarLabel || 'Dash'
-  const sidebarText = headerData.dashboardSidebarText || 'Configurable header nav'
+  const sidebarText = headerData.dashboardSidebarText || 'Configurable'
 
   return (
     <article className="pb-8 pt-8 sm:pb-12 sm:pt-12">

@@ -70,7 +70,7 @@ export const Header: GlobalConfig = {
     {
       name: 'dashboardSidebarText',
       type: 'text',
-      defaultValue: 'Configurable header nav',
+      defaultValue: 'Configurable',
       admin: {
         description: 'Supporting text shown beneath the dashboard sidebar title.',
       },
