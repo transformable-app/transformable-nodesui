@@ -24,7 +24,6 @@ export default async function ForgotPasswordPage() {
   return (
     <article className="pb-8 pt-8 sm:pb-12 sm:pt-12">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:flex-row lg:px-8">
-        <RenderParams />
         <section className="overflow-hidden rounded-2xl border bg-card shadow lg:w-[320px] lg:shrink-0">
           <div className="border-b p-6">
             <Link className="flex items-center gap-3" href="/">
@@ -53,6 +52,7 @@ export default async function ForgotPasswordPage() {
             <h1 className="text-3xl font-semibold tracking-tight text-foreground">
               Forgot password
             </h1>
+            <RenderParams messageClassName="!my-0 !bg-transparent !p-0 text-left text-sm text-muted-foreground" />
           </div>
         </section>
 
