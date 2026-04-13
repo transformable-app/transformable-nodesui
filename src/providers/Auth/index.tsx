@@ -4,6 +4,32 @@ import type { User } from '@/payload-types'
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
+const apiPath = (path: string): string => `/api${path.startsWith('/') ? path : `/${path}`}`
+
+const readErrorMessage = async (res: Response, fallback: string): Promise<string> => {
+  const body = await res.json().catch(() => null)
+
+  if (body && typeof body === 'object') {
+    if (
+      'errors' in body &&
+      Array.isArray(body.errors) &&
+      typeof body.errors[0]?.message === 'string'
+    ) {
+      return body.errors[0].message
+    }
+
+    if ('message' in body && typeof body.message === 'string') {
+      return body.message
+    }
+
+    if ('error' in body && typeof body.error === 'string') {
+      return body.error
+    }
+  }
+
+  return fallback
+}
+
 type ResetPassword = (args: {
   password: string
   passwordConfirm: string
@@ -39,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [status, setStatus] = useState<'loggedIn' | 'loggedOut' | undefined>()
   const login = useCallback<Login>(async (args) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/users/login`, {
+      const res = await fetch(apiPath('/users/login'), {
         body: JSON.stringify({
           email: args.email,
           password: args.password,
@@ -52,22 +78,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
 
       if (res.ok) {
-        const { errors, user } = await res.json()
-        if (errors) throw new Error(errors[0].message)
+        const { user } = await res.json()
         setUser(user)
         setStatus('loggedIn')
         return user
       }
 
-      throw new Error('Invalid login')
-    } catch {
-      throw new Error('An error occurred while attempting to login.')
+      throw new Error(await readErrorMessage(res, `Login failed with status ${res.status}.`))
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'An error occurred while attempting to login.')
     }
   }, [])
 
   const create = useCallback<Create>(async (args) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/storefront/create-account`, {
+      const res = await fetch(apiPath('/storefront/create-account'), {
         body: JSON.stringify({
           email: args.email,
           password: args.password,
@@ -93,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback<Logout>(async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/users/logout`, {
+      const res = await fetch(apiPath('/users/logout'), {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const fetchMe = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/users/me`, {
+        const res = await fetch(apiPath('/users/me'), {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
@@ -141,7 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const forgotPassword = useCallback<ForgotPassword>(async (args) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/users/forgot-password`, {
+      const res = await fetch(apiPath('/users/forgot-password'), {
         body: JSON.stringify({
           email: args.email,
         }),
@@ -166,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = useCallback<ResetPassword>(async (args) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/users/reset-password`, {
+      const res = await fetch(apiPath('/users/reset-password'), {
         body: JSON.stringify({
           password: args.password,
           passwordConfirm: args.passwordConfirm,

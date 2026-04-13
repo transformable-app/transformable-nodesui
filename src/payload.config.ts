@@ -33,6 +33,7 @@ const jobsAutoRunEnabled = process.env.PAYLOAD_JOBS_AUTORUN === 'true'
 const jobsAutoRunCron = process.env.PAYLOAD_JOBS_AUTORUN_CRON || '* * * * *'
 
 export default buildConfig({
+  serverURL: getServerSideURL(),
   admin: {
     meta: {
       icons: [
