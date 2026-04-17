@@ -28,7 +28,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@payload-enchants/docs-reorder": "^1.2.2",
-    "@payloadcms/admin-bar": "3.82.1",
+    "@payloadcms/admin-bar": "3.83.0",
     "@payloadcms/db-mongodb": "3.82.1",
     "@payloadcms/live-preview-react": "3.82.1",
     "@payloadcms/next": "3.82.1",
