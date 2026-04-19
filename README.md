@@ -26,20 +26,14 @@ Built with [Payload CMS](https://payloadcms.com)
 ## Quick Start
 
 1. Clone the repo and create a `.env` in the project root. Set at least:
-   - `DATABASE_URL` - MongoDB connection string
    - `PAYLOAD_SECRET` - secret for Payload auth and encryption
    - `NEXT_PUBLIC_SERVER_URL` - public URL of the app, for example `http://localhost:3000`
    - `CRON_SECRET` - bearer token for cron/job endpoints
    - `PREVIEW_SECRET` - secret used for preview routes
-   Optionally set:
-   - `PAYLOAD_JOBS_AUTORUN=true` and `PAYLOAD_JOBS_AUTORUN_CRON` to let the app execute scheduled jobs in-process
-   - `N8N_SYNC_CRON` to override the default sync cadence
-   - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` if you use forms with reCAPTCHA
-   - `NEXT_PUBLIC_SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_RELEASE` for Sentry
-2. Install dependencies and start the dev server:
+   Compose provides MongoDB defaults; override `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `MONGO_DATABASE`, `PAYLOAD_JOBS_AUTORUN`, `PAYLOAD_JOBS_AUTORUN_CRON`, `N8N_SYNC_CRON`, reCAPTCHA keys, and Sentry env vars as needed.
+2. Start the stack with Docker Compose using this project's [docker-compose.yml](./docker-compose.yml):
    ```bash
-   pnpm install
-   pnpm dev
+   docker-compose up
    ```
 3. Open `http://localhost:3000/admin`, create the first admin user, then add one or more **Servers** entries so the sync job has an n8n API to talk to.
 4. Create or edit a **Dashboard** page and add blocks such as **Servers Status List**, **Workflows List**, **Latest Executions**, **Execution Errors**, **Credentials Health**, **Data Table Viewer**, **Chat Embed**, or **Form**.
@@ -203,17 +197,14 @@ For local development you can use a local MongoDB instance, or Docker Compose fo
 
 ### Run with Docker Compose
 
-The repo includes a production-oriented Compose setup for the app and MongoDB:
+The repo includes a production Compose setup that runs the app and MongoDB:
 
-- Production Compose file: [docker-compose.yml](./docker-compose.yml)
-
-1. Set the required environment variables in `.env`: `PAYLOAD_SECRET`, `NEXT_PUBLIC_SERVER_URL`, `CRON_SECRET`, and `PREVIEW_SECRET`.
-2. Optionally set `PAYLOAD_JOBS_AUTORUN`, `PAYLOAD_JOBS_AUTORUN_CRON`, `N8N_SYNC_CRON`, reCAPTCHA keys, and Sentry env vars.
-3. Run:
+1. Set required env (for example in `.env`): `PAYLOAD_SECRET`, `NEXT_PUBLIC_SERVER_URL`, `CRON_SECRET`, `PREVIEW_SECRET`. Optionally set MongoDB credentials, `PAYLOAD_JOBS_AUTORUN`, `PAYLOAD_JOBS_AUTORUN_CRON`, `N8N_SYNC_CRON`, reCAPTCHA keys, and Sentry env vars.
+2. Run:
    ```bash
    docker-compose up
    ```
-4. Open `http://localhost:3000/admin` and create your first user.
+3. Open `http://localhost:3000/admin` and create your first user.
 
 Compose uses `ghcr.io/transformable-app/transformable-nodesui:latest` by default and can be overridden with `TRANSFORMABLE_NODESUI_IMAGE`.
 
