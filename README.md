@@ -19,9 +19,9 @@ Built with [Payload CMS](https://payloadcms.com)
 | --- | --- |
 | ![Dashboard view](docs/nodesui-dashboard.png) | ![Workflows view](docs/nodesui-workflows.png) |
 
-| Admin | Forms |
+| Forms | Admin |
 | --- | --- |
-| ![Admin view](docs/nodesui-admin.png) | ![Forms view](docs/nodesui-forms.png) |
+| ![Forms view](docs/nodesui-forms.png) | ![Admin view](docs/nodesui-admin.png) |
 
 ## Quick Start
 
