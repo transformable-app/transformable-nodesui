@@ -13,6 +13,16 @@ Built with [Payload CMS](https://payloadcms.com)
 - **Jobs and endpoints** - Run scheduled Payload jobs for n8n sync, trigger syncs manually through the admin or API, and reset the jobs queue from the admin.
 - **Admin customization** - Configure admin branding, login content, sidebar navigation, and dashboard welcome content from globals.
 
+## Screenshots
+
+| Dashboard | Workflows |
+| --- | --- |
+| ![Dashboard view](docs/nodesui-dashboard.png) | ![Workflows view](docs/nodesui-workflows.png) |
+
+| Admin | Forms |
+| --- | --- |
+| ![Admin view](docs/nodesui-admin.png) | ![Forms view](docs/nodesui-forms.png) |
+
 ## Quick Start
 
 1. Clone the repo and create a `.env` in the project root. Set at least:
@@ -194,6 +204,8 @@ For local development you can use a local MongoDB instance, or Docker Compose fo
 ### Run with Docker Compose
 
 The repo includes a production-oriented Compose setup for the app and MongoDB:
+
+- Production Compose file: [docker-compose.yml](./docker-compose.yml)
 
 1. Set the required environment variables in `.env`: `PAYLOAD_SECRET`, `NEXT_PUBLIC_SERVER_URL`, `CRON_SECRET`, and `PREVIEW_SECRET`.
 2. Optionally set `PAYLOAD_JOBS_AUTORUN`, `PAYLOAD_JOBS_AUTORUN_CRON`, `N8N_SYNC_CRON`, reCAPTCHA keys, and Sentry env vars.
