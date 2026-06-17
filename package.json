@@ -1,6 +1,6 @@
 {
   "name": "transformable-nodesui",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Dashboard-focused Payload CMS app for monitoring n8n instances",
   "license": "MIT",
   "source": "https://github.com/transformable-app/transformable-nodesui",
@@ -104,6 +104,8 @@
       "file-type": ">=21.3.1",
       "fast-xml-parser": ">=5.7.0",
       "rollup": ">=4.59.0",
+      "esbuild": ">=0.28.1",
+      "@opentelemetry/core": ">=2.8.0",
       "minimatch": ">=10.2.3",
       "undici": ">=7.24.0",
       "flatted": ">=3.4.2",
