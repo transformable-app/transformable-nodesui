@@ -190,6 +190,7 @@ export interface Page {
     | LatestExecutionsBlock
     | ExecutionErrorsBlock
     | DataTableViewerBlock
+    | AgentChatBlock
     | ChatEmbedBlock
     | FormBlock
   )[];
@@ -475,6 +476,96 @@ export interface DataTable {
   remoteCreatedAt?: string | null;
   remoteUpdatedAt?: string | null;
   lastSeenAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "AgentChatBlock".
+ */
+export interface AgentChatBlock {
+  title: string;
+  description?: string | null;
+  /**
+   * Only enabled agents visible to the current user can be invoked.
+   */
+  agent: string | Agent;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'agentChat';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agents".
+ */
+export interface Agent {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  enabled: boolean;
+  server: string | Server;
+  workflow: string | Workflow;
+  transport: 'chat-trigger' | 'webhook';
+  /**
+   * Relative production webhook/chat path, for example /webhook/agent. Absolute URLs are rejected.
+   */
+  endpointPath: string;
+  authStrategy: 'server-secret' | 'header' | 'jwt';
+  /**
+   * Environment variable name resolved server-side for n8n invocation auth.
+   */
+  secretReference?: string | null;
+  /**
+   * Non-admin users need one of these roles to invoke this agent.
+   */
+  allowedRoles?: (string | Role)[] | null;
+  inputMode: 'chat' | 'structured';
+  inputSchema?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  outputSchema?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  streamingEnabled?: boolean | null;
+  /**
+   * Per-user rate limit for this agent.
+   */
+  maxRunsPerMinute: number;
+  /**
+   * Per-user concurrent run limit for this agent.
+   */
+  maxConcurrentRuns: number;
+  timeoutMS: number;
+  maxInputBytes: number;
+  welcomeMessage?: string | null;
+  placeholder?: string | null;
+  suggestedPrompts?: string[] | null;
+  /**
+   * Non-secret capability summary from the selected workflow.
+   */
+  capabilities?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  configurationWarning?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -933,81 +1024,6 @@ export interface DataTableRow {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "agents".
- */
-export interface Agent {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  enabled: boolean;
-  server: string | Server;
-  workflow: string | Workflow;
-  transport: 'chat-trigger' | 'webhook';
-  /**
-   * Relative production webhook/chat path, for example /webhook/agent. Absolute URLs are rejected.
-   */
-  endpointPath: string;
-  authStrategy: 'server-secret' | 'header' | 'jwt';
-  /**
-   * Environment variable name resolved server-side for n8n invocation auth.
-   */
-  secretReference?: string | null;
-  /**
-   * Non-admin users need one of these roles to invoke this agent.
-   */
-  allowedRoles?: (string | Role)[] | null;
-  inputMode: 'chat' | 'structured';
-  inputSchema?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  outputSchema?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  streamingEnabled?: boolean | null;
-  /**
-   * Per-user rate limit for this agent.
-   */
-  maxRunsPerMinute: number;
-  /**
-   * Per-user concurrent run limit for this agent.
-   */
-  maxConcurrentRuns: number;
-  timeoutMS: number;
-  maxInputBytes: number;
-  welcomeMessage?: string | null;
-  placeholder?: string | null;
-  suggestedPrompts?: string[] | null;
-  /**
-   * Non-secret capability summary from the selected workflow.
-   */
-  capabilities?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  configurationWarning?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agent-sessions".
  */
 export interface AgentSession {
@@ -1399,6 +1415,7 @@ export interface PagesSelect<T extends boolean = true> {
         latestExecutions?: T | LatestExecutionsBlockSelect<T>;
         executionErrors?: T | ExecutionErrorsBlockSelect<T>;
         dataTableViewer?: T | DataTableViewerBlockSelect<T>;
+        agentChat?: T | AgentChatBlockSelect<T>;
         chatEmbed?: T | ChatEmbedBlockSelect<T>;
         formBlock?: T | FormBlockSelect<T>;
       };
@@ -1494,6 +1511,17 @@ export interface DataTableViewerBlockSelect<T extends boolean = true> {
   pagingMode?: T;
   defaultSort?: T;
   pageSize?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "AgentChatBlock_select".
+ */
+export interface AgentChatBlockSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  agent?: T;
   id?: T;
   blockName?: T;
 }

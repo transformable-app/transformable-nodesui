@@ -1,6 +1,7 @@
 import { APIError, type Endpoint } from 'payload'
 
 import {
+  cancelAgentRun,
   createAgentSession,
   listAgentMessages,
   sendAgentMessage,
@@ -122,6 +123,22 @@ export const agentEndpoints: Endpoint[] = [
       })
 
       return Response.json({ run })
+    },
+  },
+  {
+    path: '/agent-runs/:id/cancel',
+    method: 'post',
+    handler: async (req) => {
+      try {
+        const run = await cancelAgentRun({
+          req: requireUser(req),
+          runID: String(req.routeParams?.id ?? ''),
+        })
+
+        return Response.json({ run })
+      } catch (error) {
+        return handleAgentError(error)
+      }
     },
   },
 ]

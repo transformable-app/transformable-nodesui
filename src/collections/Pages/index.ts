@@ -8,6 +8,7 @@ import { authenticated } from '../../access/authenticated'
 import { readPublishedDashboards } from '../../access/readPublishedDashboards'
 import { checkRole } from '../../access/utilities'
 import { ChatEmbedBlock } from '../../blocks/ChatEmbed/config'
+import { AgentChatBlock } from '../../blocks/AgentChat/config'
 import { CredentialsHealthBlock } from '../../blocks/CredentialsHealth/config'
 import { DataTableViewerBlock } from '../../blocks/DataTableViewer/config'
 import { ExecutionErrorsBlock } from '../../blocks/ExecutionErrors/config'
@@ -108,6 +109,7 @@ export const Pages: CollectionConfig<'pages'> = {
                 LatestExecutionsBlock,
                 ExecutionErrorsBlock,
                 DataTableViewerBlock,
+                AgentChatBlock,
                 ChatEmbedBlock,
                 FormBlock,
               ],

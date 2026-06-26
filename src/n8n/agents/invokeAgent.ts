@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import * as Sentry from '@sentry/nextjs'
 
 import { getRelationshipID, resolveAgentBySlug } from './resolveAgent'
 import { invokeN8nAgent, invokeN8nAgentStream, stopN8nExecution } from './adapters'
@@ -733,6 +734,10 @@ export const streamAgentMessage = async ({
             executionID: streamedExecutionID,
             server: resolved.server,
           }).catch((stopError) => {
+            Sentry.captureException(stopError, {
+              tags: { area: 'agent-harness', requestID },
+              extra: { n8nExecutionID: streamedExecutionID, runID: run.id },
+            })
             req.payload.logger.error(
               { err: stopError, n8nExecutionID: streamedExecutionID, requestID, runID: run.id },
               'failed to stop n8n execution',
@@ -781,6 +786,10 @@ export const streamAgentMessage = async ({
         })
 
         req.payload.logger.error({ err: error, requestID, runID: run.id }, 'agent stream failed')
+        Sentry.captureException(error, {
+          tags: { area: 'agent-harness', requestID },
+          extra: { n8nExecutionID: streamedExecutionID, runID: run.id },
+        })
         emit({ data: { code: harnessError.code, message: harnessError.message }, type: 'error' })
         emit({ data: { runID: String(failedRun.id), status }, type: 'done' })
       } finally {
@@ -831,6 +840,75 @@ export const listAgentMessages = async ({
       },
     },
   })
+}
+
+export const cancelAgentRun = async ({ req, runID }: { req: AgentRequest; runID: string }) => {
+  const run = await req.payload.findByID({
+    collection: 'agent-runs',
+    depth: 2,
+    id: runID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  if (!run) throw new AgentHarnessError('not-found', 'Run not found.', 404)
+
+  if (['succeeded', 'failed', 'timed-out', 'cancelled'].includes(run.status)) {
+    return run
+  }
+
+  const agent = run.agent
+  const server = agent && typeof agent === 'object' ? agent.server : undefined
+
+  if (run.n8nExecutionID && server && typeof server === 'object') {
+    await stopN8nExecution({
+      executionID: run.n8nExecutionID,
+      server: server as unknown as Record<string, unknown>,
+    }).catch((error) => {
+      Sentry.captureException(error, {
+        tags: { area: 'agent-harness', requestID: run.requestID },
+        extra: { n8nExecutionID: run.n8nExecutionID, runID },
+      })
+      req.payload.logger.error(
+        { err: error, n8nExecutionID: run.n8nExecutionID, requestID: run.requestID, runID },
+        'failed to stop n8n execution',
+      )
+    })
+  }
+
+  const finishedAt = new Date().toISOString()
+  const updatedRun = await req.payload.update({
+    collection: 'agent-runs',
+    data: {
+      errorCode: 'cancelled',
+      errorMessage: 'Run was cancelled by the user.',
+      finishedAt,
+      status: 'cancelled',
+    },
+    id: runID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  const sessionID = getRelationshipID(run.session)
+
+  if (sessionID) {
+    await req.payload.update({
+      collection: 'agent-sessions',
+      data: {
+        lastRunAt: finishedAt,
+        status: 'cancelled',
+      },
+      id: sessionID,
+      overrideAccess: false,
+      req,
+      user: req.user,
+    })
+  }
+
+  return updatedRun
 }
 
 export const updateRunFromCallback = async (

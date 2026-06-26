@@ -83,7 +83,11 @@ type N8nWorkflow = {
   settings?: Record<string, unknown>
   meta?: Record<string, unknown> | null
   tags?: N8nTag[]
-  shared?: Array<{ projectId?: string; role?: string; project?: { id?: string; name?: string; type?: string } }>
+  shared?: Array<{
+    projectId?: string
+    role?: string
+    project?: { id?: string; name?: string; type?: string }
+  }>
 }
 
 type N8nCredential = {
@@ -93,7 +97,13 @@ type N8nCredential = {
   createdAt?: string
   updatedAt?: string
   isResolvable?: boolean
-  shared?: Array<{ id?: string; name?: string; role?: string; createdAt?: string; updatedAt?: string }>
+  shared?: Array<{
+    id?: string
+    name?: string
+    role?: string
+    createdAt?: string
+    updatedAt?: string
+  }>
 }
 
 type N8nExecution = {
@@ -121,7 +131,10 @@ const buildBaseAPIURL = (server: Pick<SyncableServer, 'apiPath' | 'baseURL'>) =>
   return `${baseURL}${apiPath}`
 }
 
-const buildDashboardURL = (server: Pick<SyncableServer, 'baseURL' | 'dashboardURL'>, path: string) => {
+const buildDashboardURL = (
+  server: Pick<SyncableServer, 'baseURL' | 'dashboardURL'>,
+  path: string,
+) => {
   const base = trimTrailingSlash(server.dashboardURL || server.baseURL)
   return `${base}${ensureLeadingSlash(path)}`
 }
@@ -132,7 +145,8 @@ const toDateOrUndefined = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-const buildSourceKey = (server: Pick<SyncableServer, 'id'>, tableID: string) => `${server.id}:${tableID}`
+const buildSourceKey = (server: Pick<SyncableServer, 'id'>, tableID: string) =>
+  `${server.id}:${tableID}`
 
 const buildRowSourceKey = ({
   rowID,
@@ -147,8 +161,7 @@ const buildRowSourceKey = ({
 const normalizeRowID = (rowID: N8nDataTableRow['id']) =>
   rowID != null && rowID !== '' ? String(rowID) : undefined
 
-const getRelationID = (value: DataTable['server']) =>
-  typeof value === 'string' ? value : value.id
+const getRelationID = (value: DataTable['server']) => (typeof value === 'string' ? value : value.id)
 
 const findExistingDataTables = async ({
   payload,
@@ -291,11 +304,14 @@ const getExecutionErrorMessage = (execution: N8nExecution) => {
 
   const candidatePaths = [
     (maybeData as { resultData?: { error?: { message?: string } } }).resultData?.error?.message,
-    (maybeData as { resultData?: { error?: { description?: string } } }).resultData?.error?.description,
+    (maybeData as { resultData?: { error?: { description?: string } } }).resultData?.error
+      ?.description,
     (maybeData as { error?: { message?: string } }).error?.message,
   ]
 
-  return candidatePaths.find((value): value is string => typeof value === 'string' && value.length > 0)
+  return candidatePaths.find(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  )
 }
 
 const getExecutionErrorStack = (execution: N8nExecution) => {
@@ -427,7 +443,7 @@ const getServersToSync = async (payload: Payload, serverID?: string) => {
     throw new Error(
       serverID
         ? 'The selected server is missing one of the required sync fields: baseURL or apiKey.'
-        : 'No eligible servers found. Make sure at least one server has baseURL, apiKey, and is not explicitly disabled.'
+        : 'No eligible servers found. Make sure at least one server has baseURL, apiKey, and is not explicitly disabled.',
     )
   }
 
@@ -858,6 +874,61 @@ const findExistingExecution = async ({
   return existing.docs[0]
 }
 
+const findRequestID = (value: unknown): string | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+
+  const record = value as Record<string, unknown>
+  if (typeof record.requestID === 'string') return record.requestID
+  if (typeof record.requestId === 'string') return record.requestId
+
+  for (const child of Object.values(record)) {
+    const found = findRequestID(child)
+    if (found) return found
+  }
+
+  return undefined
+}
+
+const linkAgentRunToExecution = async ({
+  executionDocID,
+  executionID,
+  payload,
+  requestID,
+}: {
+  executionDocID: string
+  executionID: string
+  payload: Payload
+  requestID?: string
+}) => {
+  if (!requestID) return
+
+  const runs = await payload.find({
+    collection: 'agent-runs',
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    pagination: false,
+    where: {
+      requestID: {
+        equals: requestID,
+      },
+    },
+  })
+
+  const run = runs.docs[0]
+  if (!run) return
+
+  await payload.update({
+    collection: 'agent-runs',
+    data: {
+      execution: executionDocID,
+      n8nExecutionID: executionID,
+    },
+    id: run.id,
+    overrideAccess: true,
+  })
+}
+
 const getWorkflowMapForServer = async (payload: Payload, serverID: string) => {
   const result = await payload.find({
     collection: 'workflows',
@@ -907,7 +978,9 @@ const syncServerWorkflows = async ({
       settings: workflow.settings,
       sourceKey,
       status: deriveWorkflowStatus(workflow),
-      tags: workflow.tags?.map((tag) => tag.name).filter((value): value is string => Boolean(value)),
+      tags: workflow.tags
+        ?.map((tag) => tag.name)
+        .filter((value): value is string => Boolean(value)),
       triggerCount: workflow.triggerCount,
       versionID: workflow.versionId,
       workflowID,
@@ -972,7 +1045,9 @@ const syncServerCredentials = async ({
       name: credential.name,
       remoteCreatedAt: toDateOrUndefined(credential.createdAt),
       remoteUpdatedAt: toDateOrUndefined(credential.updatedAt),
-      scopes: credential.shared?.map((item) => item.role).filter((value): value is string => Boolean(value)),
+      scopes: credential.shared
+        ?.map((item) => item.role)
+        .filter((value): value is string => Boolean(value)),
       server: server.id,
       sourceKey,
       summary: summarizeCredentialSharing(credential),
@@ -1071,19 +1146,36 @@ const syncServerExecutions = async ({
       sourceKey,
     })
 
+    const requestID = findRequestID({
+      customData: execution.customData,
+      data: execution.data,
+    })
+
     if (existing) {
-      await payload.update({
+      const updatedExecution = await payload.update({
         collection: 'executions',
         id: existing.id,
         data,
       })
+      await linkAgentRunToExecution({
+        executionDocID: updatedExecution.id,
+        executionID,
+        payload,
+        requestID,
+      })
       continue
     }
 
-    await payload.create({
+    const createdExecution = await payload.create({
       collection: 'executions',
       draft: false,
       data,
+    })
+    await linkAgentRunToExecution({
+      executionDocID: createdExecution.id,
+      executionID,
+      payload,
+      requestID,
     })
   }
 

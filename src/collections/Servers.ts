@@ -2,9 +2,13 @@ import type { CollectionConfig } from 'payload'
 
 import { authenticated } from '@/access/authenticated'
 import { anyone } from '@/access/anyone'
+import { checkRole } from '@/access/utilities'
 import { environmentOptions, serverStatusOptions } from '@/n8n/constants'
+import type { User } from '@/payload-types'
 
 const fieldAccess = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
+const adminFieldAccess = ({ req }: { req: { user?: unknown } }) =>
+  checkRole(['Admin'], req.user as User | null | undefined)
 
 export const Servers: CollectionConfig = {
   slug: 'servers',
@@ -56,6 +60,9 @@ export const Servers: CollectionConfig = {
       type: 'text',
       label: 'Base URL',
       required: true,
+      access: {
+        read: fieldAccess,
+      },
       admin: {
         description: 'Base URL for the n8n instance, for example https://n8n.example.com.',
       },
@@ -65,6 +72,9 @@ export const Servers: CollectionConfig = {
       type: 'text',
       defaultValue: '/api/v1',
       required: true,
+      access: {
+        read: fieldAccess,
+      },
       admin: {
         description: 'API base path used by the sync job. Defaults to /api/v1 for self-hosted n8n.',
       },
@@ -73,6 +83,9 @@ export const Servers: CollectionConfig = {
       name: 'dashboardURL',
       type: 'text',
       label: 'Dashboard URL',
+      access: {
+        read: fieldAccess,
+      },
       admin: {
         description: 'Optional direct link to the n8n UI for this server.',
       },
@@ -83,8 +96,8 @@ export const Servers: CollectionConfig = {
       label: 'API Key',
       required: true,
       access: {
-        read: fieldAccess,
-        update: fieldAccess,
+        read: adminFieldAccess,
+        update: adminFieldAccess,
       },
       admin: {
         components: {
@@ -150,7 +163,8 @@ export const Servers: CollectionConfig = {
       name: 'syncCursor',
       type: 'json',
       admin: {
-        description: 'Opaque checkpoint data for incremental syncs, such as pagination or updated-after cursors.',
+        description:
+          'Opaque checkpoint data for incremental syncs, such as pagination or updated-after cursors.',
       },
     },
   ],

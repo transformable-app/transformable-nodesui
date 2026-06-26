@@ -1,6 +1,6 @@
 # n8n Agent Harness Testing
 
-This guide verifies the first harness slice: agent registration, authenticated session creation, message invocation, callback completion, history reads, and feedback.
+This guide verifies the agent harness: agent registration, authenticated session creation, message invocation, structured SSE streaming, callback completion, history reads, cancellation, reconciliation, and feedback.
 
 ## Prerequisites
 
@@ -62,6 +62,9 @@ In Payload admin, create an `Agents` record:
 - `Secret Reference`: `TEST_AGENT_WEBHOOK_SECRET`
 - `Allowed Roles`: include `User` for non-admin testing
 - `Input Mode`: `Chat`
+- `Streaming Enabled`: checked for structured SSE tests
+- `Max Runs Per Minute`: `12`
+- `Max Concurrent Runs`: `1`
 - `Timeout MS`: `30000`
 - `Max Input Bytes`: `20000`
 
@@ -120,6 +123,57 @@ await fetch(`/api/agent-sessions/${session.id}/messages`).then((res) => res.json
 
 Expected result: messages return in `sequence` order.
 
+## Structured SSE Test
+
+For streaming agents, send a message with `Accept: text/event-stream`:
+
+```js
+const streamResponse = await fetch(`/api/agent-sessions/${session.id}/messages`, {
+  method: 'POST',
+  headers: {
+    accept: 'text/event-stream',
+    'content-type': 'application/json',
+  },
+  body: JSON.stringify({ text: 'stream hello from Payload' }),
+})
+
+const reader = streamResponse.body.getReader()
+const decoder = new TextDecoder()
+let streamText = ''
+
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  streamText += decoder.decode(value, { stream: true })
+}
+
+streamText
+```
+
+Expected result:
+
+- HTTP `200`
+- `content-type` is `text/event-stream`
+- The stream includes structured `run`, `token`, `message`, and `done` events
+- The assistant message is persisted with `status: "complete"`
+- The run is terminal, normally `status: "succeeded"`
+
+## Cancellation Test
+
+Start a streaming request against a workflow that runs long enough to cancel, then call:
+
+```js
+await fetch(`/api/agent-runs/${RUN_ID}/cancel`, {
+  method: 'POST',
+}).then((res) => res.json())
+```
+
+Expected result:
+
+- The run is updated to `status: "cancelled"`
+- If the run has `n8nExecutionID`, Payload makes a best-effort n8n stop-execution request
+- The owning session is marked `cancelled`
+
 Submit feedback:
 
 ```js
@@ -168,6 +222,20 @@ Verify these failures before exposing the harness beyond admin testing:
 - Missing or wrong `N8N_CALLBACK_SECRET` returns `401` on callback.
 - Message body larger than `Max Input Bytes` returns `413`.
 - Reusing the same `idempotencyKey` for the same session returns the existing run instead of creating a duplicate.
+- A second in-flight send for the same session returns `409`.
+- Exceeding `Max Runs Per Minute` or `Max Concurrent Runs` returns `429`.
+
+## Reconciliation Test
+
+The `agent-run-reconciliation` task checks stale non-terminal runs independently from the full n8n sync.
+
+To test manually, create or identify an old `queued`, `running`, or `waiting` run and execute the task with a short `staleAfterMS` value.
+
+Expected result:
+
+- The stale run is marked `timed-out`
+- The session is moved out of `waiting`
+- The task output includes the number of reconciled runs
 
 ## Admin Records To Inspect
 
@@ -182,4 +250,4 @@ The agent collections should appear after `Data Table Rows` in the admin nav.
 
 ## Current Scope Limits
 
-This implementation covers the first non-streaming harness slice. It does not yet provide a first-party chat block UI, streaming proxy, approval records, run reconciliation task, or n8n stop-execution cancellation.
+This implementation covers the authenticated conversational harness through structured SSE streaming, explicit cancellation, and stale-run reconciliation. It does not yet provide approval records/resume handling, retention/anonymization jobs, evaluation datasets, or long-running user notifications beyond persisted session/run/message state.

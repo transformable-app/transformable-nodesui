@@ -4,6 +4,8 @@ import { authenticated } from '@/access/authenticated'
 import { anyone } from '@/access/anyone'
 import { workflowStatusOptions } from '@/n8n/constants'
 
+const authenticatedFieldAccess = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
+
 export const Workflows: CollectionConfig = {
   slug: 'workflows',
   labels: {
@@ -43,7 +45,8 @@ export const Workflows: CollectionConfig = {
       required: true,
       index: true,
       admin: {
-        description: 'Raw workflow ID returned by n8n. Not globally unique across multiple servers.',
+        description:
+          'Raw workflow ID returned by n8n. Not globally unique across multiple servers.',
       },
     },
     {
@@ -53,7 +56,8 @@ export const Workflows: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Stable sync key in the form "<server-id>:<workflowID>". Used for idempotent upserts.',
+        description:
+          'Stable sync key in the form "<server-id>:<workflowID>". Used for idempotent upserts.',
       },
     },
     {
@@ -152,10 +156,16 @@ export const Workflows: CollectionConfig = {
     {
       name: 'settings',
       type: 'json',
+      access: {
+        read: authenticatedFieldAccess,
+      },
     },
     {
       name: 'apiData',
       type: 'json',
+      access: {
+        read: authenticatedFieldAccess,
+      },
       admin: {
         description: 'Raw workflow payload from the n8n API.',
       },

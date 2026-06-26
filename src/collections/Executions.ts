@@ -41,7 +41,8 @@ export const Executions: CollectionConfig = {
       required: true,
       index: true,
       admin: {
-        description: 'Raw execution ID returned by n8n. Not globally unique across multiple servers.',
+        description:
+          'Raw execution ID returned by n8n. Not globally unique across multiple servers.',
       },
     },
     {
@@ -51,7 +52,8 @@ export const Executions: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Stable sync key in the form "<server-id>:<executionID>". Used for idempotent upserts.',
+        description:
+          'Stable sync key in the form "<server-id>:<executionID>". Used for idempotent upserts.',
       },
     },
     {
@@ -144,10 +146,16 @@ export const Executions: CollectionConfig = {
     {
       name: 'payloadPreview',
       type: 'json',
+      access: {
+        read: fieldAccess,
+      },
     },
     {
       name: 'apiData',
       type: 'json',
+      access: {
+        read: fieldAccess,
+      },
       admin: {
         description: 'Raw execution payload from the n8n API for audit/debug purposes.',
       },

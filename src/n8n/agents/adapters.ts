@@ -1,33 +1,7 @@
 import { buildAgentEndpoint } from './buildEndpoint'
-import { toPreview } from './redact'
+import { buildChatTriggerBody, parseChatTriggerResponse } from './chatTriggerAdapter'
 import { AgentHarnessError, type AgentInvocation, type AgentInvokeResult } from './types'
-
-const extractResponse = (value: unknown): AgentInvokeResult => {
-  if (!value || typeof value !== 'object') {
-    return {
-      content: typeof value === 'string' ? value : toPreview(value),
-      status: 'succeeded',
-    }
-  }
-
-  const data = value as Record<string, unknown>
-  const contentValue = data.content ?? data.text ?? data.output ?? data.message ?? data.response
-  const status = data.status === 'waiting' ? 'waiting' : 'succeeded'
-
-  return {
-    content: typeof contentValue === 'string' ? contentValue : toPreview(contentValue ?? data),
-    data:
-      typeof data.data === 'object' && data.data
-        ? (data.data as Record<string, unknown>)
-        : undefined,
-    n8nExecutionID: typeof data.n8nExecutionID === 'string' ? data.n8nExecutionID : undefined,
-    status,
-    usage:
-      typeof data.usage === 'object' && data.usage
-        ? (data.usage as Record<string, unknown>)
-        : undefined,
-  }
-}
+import { buildWebhookBody, parseWebhookResponse } from './webhookAdapter'
 
 const resolveSecret = (secretReference: unknown): string | null => {
   if (typeof secretReference !== 'string' || secretReference.trim().length === 0) return null
@@ -61,18 +35,7 @@ export const invokeN8nAgent = async ({
   try {
     const transport = agent.transport === 'chat-trigger' ? 'chat-trigger' : 'webhook'
     const body =
-      transport === 'chat-trigger'
-        ? {
-            action: 'sendMessage',
-            chatInput: invocation.input.text ?? '',
-            metadata: {
-              actor: invocation.actor,
-              context: invocation.context,
-              requestID: invocation.requestID,
-            },
-            sessionId: invocation.sessionID,
-          }
-        : invocation
+      transport === 'chat-trigger' ? buildChatTriggerBody(invocation) : buildWebhookBody(invocation)
 
     const response = await fetch(endpoint, {
       body: JSON.stringify(body),
@@ -95,7 +58,10 @@ export const invokeN8nAgent = async ({
       }
     }
 
-    return extractResponse(await response.json())
+    const responseBody = await response.json()
+    return transport === 'chat-trigger'
+      ? parseChatTriggerResponse(responseBody)
+      : parseWebhookResponse(responseBody)
   } catch (error) {
     if (error instanceof AgentHarnessError) throw error
     if (error instanceof Error && error.name === 'AbortError') {
@@ -118,19 +84,10 @@ const resolveTransportBody = ({
   const transport = agent.transport === 'chat-trigger' ? 'chat-trigger' : 'webhook'
 
   if (transport === 'chat-trigger') {
-    return {
-      action: 'sendMessage',
-      chatInput: invocation.input.text ?? '',
-      metadata: {
-        actor: invocation.actor,
-        context: invocation.context,
-        requestID: invocation.requestID,
-      },
-      sessionId: invocation.sessionID,
-    }
+    return buildChatTriggerBody(invocation)
   }
 
-  return invocation
+  return buildWebhookBody(invocation)
 }
 
 const buildInvocationHeaders = (agent: Record<string, unknown>) => {
