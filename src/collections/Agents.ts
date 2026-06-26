@@ -106,7 +106,8 @@ export const Agents: CollectionConfig = {
       type: 'text',
       required: true,
       admin: {
-        description: 'Relative production webhook/chat path, for example /webhook/agent. Absolute URLs are rejected.',
+        description:
+          'Relative production webhook/chat path, for example /webhook/agent. Absolute URLs are rejected.',
       },
     },
     {
@@ -158,6 +159,28 @@ export const Agents: CollectionConfig = {
       name: 'streamingEnabled',
       type: 'checkbox',
       defaultValue: false,
+    },
+    {
+      name: 'maxRunsPerMinute',
+      type: 'number',
+      defaultValue: 12,
+      min: 1,
+      max: 120,
+      required: true,
+      admin: {
+        description: 'Per-user rate limit for this agent.',
+      },
+    },
+    {
+      name: 'maxConcurrentRuns',
+      type: 'number',
+      defaultValue: 1,
+      min: 1,
+      max: 10,
+      required: true,
+      admin: {
+        description: 'Per-user concurrent run limit for this agent.',
+      },
     },
     {
       name: 'timeoutMS',

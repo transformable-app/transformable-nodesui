@@ -1,11 +1,14 @@
 import { randomUUID } from 'crypto'
 
 import { getRelationshipID, resolveAgentBySlug } from './resolveAgent'
-import { invokeN8nAgent } from './adapters'
+import { invokeN8nAgent, invokeN8nAgentStream, stopN8nExecution } from './adapters'
 import { redactValue, toPreview } from './redact'
-import { AgentHarnessError, type AgentRequest } from './types'
+import { AgentHarnessError, type AgentRequest, type AgentStreamEvent } from './types'
 
 const MAX_CONTEXT_KEYS = 20
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000
+const DEFAULT_MAX_RUNS_PER_WINDOW = 12
+const DEFAULT_MAX_CONCURRENT_RUNS = 1
 
 type JSONReadableRequest = {
   json?: () => Promise<unknown>
@@ -40,7 +43,9 @@ const assertTextInput = (value: unknown, maxBytes: number): string => {
 const sanitizeContext = (value: unknown): Record<string, unknown> | undefined => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
 
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).slice(0, MAX_CONTEXT_KEYS))
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).slice(0, MAX_CONTEXT_KEYS),
+  )
 }
 
 const getNextSequence = async (req: AgentRequest, sessionID: string): Promise<number> => {
@@ -63,13 +68,192 @@ const getNextSequence = async (req: AgentRequest, sessionID: string): Promise<nu
   return typeof latestSequence === 'number' ? latestSequence + 1 : 1
 }
 
-export const createAgentSession = async ({
+const assertRunCapacity = async ({
+  agent,
+  agentID,
   req,
-  slug,
+  sessionID,
 }: {
+  agent: Record<string, unknown>
+  agentID: string
   req: AgentRequest
-  slug: string
+  sessionID: string
 }) => {
+  const runningStatuses = ['queued', 'running'] as const
+  const sessionRuns = await req.payload.find({
+    collection: 'agent-runs',
+    depth: 0,
+    limit: 1,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: {
+      and: [{ session: { equals: sessionID } }, { status: { in: runningStatuses } }],
+    },
+  })
+
+  if (sessionRuns.totalDocs > 0) {
+    throw new AgentHarnessError(
+      'rate-limited',
+      'This session already has a message in progress.',
+      409,
+    )
+  }
+
+  const maxConcurrentRuns =
+    typeof agent.maxConcurrentRuns === 'number'
+      ? agent.maxConcurrentRuns
+      : DEFAULT_MAX_CONCURRENT_RUNS
+  const concurrentRuns = await req.payload.find({
+    collection: 'agent-runs',
+    depth: 0,
+    limit: maxConcurrentRuns,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: {
+      and: [
+        { agent: { equals: agentID } },
+        { user: { equals: req.user.id } },
+        { status: { in: runningStatuses } },
+      ],
+    },
+  })
+
+  if (concurrentRuns.totalDocs >= maxConcurrentRuns) {
+    throw new AgentHarnessError(
+      'rate-limited',
+      'This agent already has a run in progress for your account.',
+      429,
+    )
+  }
+
+  const windowStart = new Date(Date.now() - DEFAULT_RATE_LIMIT_WINDOW_MS).toISOString()
+  const maxRunsPerWindow =
+    typeof agent.maxRunsPerMinute === 'number'
+      ? agent.maxRunsPerMinute
+      : DEFAULT_MAX_RUNS_PER_WINDOW
+  const recentRuns = await req.payload.find({
+    collection: 'agent-runs',
+    depth: 0,
+    limit: maxRunsPerWindow,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: {
+      and: [
+        { agent: { equals: agentID } },
+        { user: { equals: req.user.id } },
+        { startedAt: { greater_than: windowStart } },
+      ],
+    },
+  })
+
+  if (recentRuns.totalDocs >= maxRunsPerWindow) {
+    throw new AgentHarnessError('rate-limited', 'Too many agent requests. Try again shortly.', 429)
+  }
+}
+
+const encodeSSE = (event: AgentStreamEvent): string =>
+  `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`
+
+const extractStreamContent = (value: unknown): string => {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object') return ''
+
+  const data = value as Record<string, unknown>
+  const content =
+    data.content ?? data.token ?? data.delta ?? data.text ?? data.message ?? data.response
+  return typeof content === 'string' ? content : ''
+}
+
+const extractStreamExecutionID = (value: unknown): string | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+
+  const data = value as Record<string, unknown>
+  return typeof data.n8nExecutionID === 'string' ? data.n8nExecutionID : undefined
+}
+
+const parseStreamPayload = (value: string): unknown => {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    return trimmed
+  }
+}
+
+const streamUpstreamToSSE = async ({
+  controller,
+  emit,
+  onExecutionID,
+  upstream,
+}: {
+  controller: ReadableStreamDefaultController<Uint8Array>
+  emit: (event: AgentStreamEvent) => void
+  onExecutionID?: (executionID: string) => void
+  upstream: Response
+}): Promise<{ content: string; n8nExecutionID?: string }> => {
+  const reader = upstream.body?.getReader()
+  if (!reader)
+    throw new AgentHarnessError('malformed-response', 'n8n returned an empty stream.', 502)
+
+  const decoder = new TextDecoder()
+  const contentType = upstream.headers.get('content-type') ?? ''
+  let buffer = ''
+  let assembled = ''
+  let n8nExecutionID: string | undefined
+
+  const emitToken = (content: string) => {
+    if (!content) return
+    assembled += content
+    emit({ data: { content }, type: 'token' })
+  }
+
+  const processSSEFrame = (frame: string) => {
+    const dataLines = frame
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+
+    if (dataLines.length === 0) return
+    const payload = parseStreamPayload(dataLines.join('\n'))
+    const executionID = extractStreamExecutionID(payload)
+    if (executionID && !n8nExecutionID) {
+      n8nExecutionID = executionID
+      onExecutionID?.(executionID)
+    }
+    const content = extractStreamContent(payload)
+    emitToken(content)
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const chunk = decoder.decode(value, { stream: true })
+
+    if (contentType.includes('text/event-stream')) {
+      buffer += chunk
+      const frames = buffer.split(/\n\n|\r\n\r\n/)
+      buffer = frames.pop() ?? ''
+      frames.forEach(processSSEFrame)
+    } else {
+      emitToken(chunk)
+    }
+  }
+
+  if (contentType.includes('text/event-stream') && buffer.trim()) {
+    processSSEFrame(buffer)
+  }
+
+  controller.enqueue(new TextEncoder().encode(': stream closed\n\n'))
+  return { content: assembled, n8nExecutionID }
+}
+
+export const createAgentSession = async ({ req, slug }: { req: AgentRequest; slug: string }) => {
   const body = await readJSON(req)
   const { agent } = await resolveAgentBySlug({ req, slug })
   const now = new Date().toISOString()
@@ -117,7 +301,11 @@ export const sendAgentMessage = async ({
 
   if (!session) throw new AgentHarnessError('not-found', 'Session not found.', 404)
   if (session.status === 'waiting') {
-    throw new AgentHarnessError('input-validation', 'Session is waiting for the current run to finish.', 409)
+    throw new AgentHarnessError(
+      'input-validation',
+      'Session is waiting for the current run to finish.',
+      409,
+    )
   }
 
   const agent = session.agent
@@ -151,6 +339,12 @@ export const sendAgentMessage = async ({
   }
 
   const sequence = await getNextSequence(req, sessionID)
+  await assertRunCapacity({
+    agent: resolved.agent,
+    agentID: String(resolved.agent.id),
+    req,
+    sessionID,
+  })
 
   const run = await req.payload.create({
     collection: 'agent-runs',
@@ -197,7 +391,10 @@ export const sendAgentMessage = async ({
         },
         context: sanitizeContext(body.context),
         input: {
-          data: body.data && typeof body.data === 'object' ? (body.data as Record<string, unknown>) : undefined,
+          data:
+            body.data && typeof body.data === 'object'
+              ? (body.data as Record<string, unknown>)
+              : undefined,
           text,
         },
         requestID,
@@ -293,6 +490,317 @@ export const sendAgentMessage = async ({
   }
 }
 
+export const streamAgentMessage = async ({
+  req,
+  sessionID,
+}: {
+  req: AgentRequest
+  sessionID: string
+}): Promise<Response> => {
+  const body = await readJSON(req)
+  const session = await req.payload.findByID({
+    collection: 'agent-sessions',
+    depth: 2,
+    id: sessionID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  if (!session) throw new AgentHarnessError('not-found', 'Session not found.', 404)
+  if (session.status === 'waiting') {
+    throw new AgentHarnessError(
+      'input-validation',
+      'Session is waiting for the current run to finish.',
+      409,
+    )
+  }
+
+  const agent = session.agent
+  if (!agent || typeof agent !== 'object' || typeof agent.slug !== 'string') {
+    throw new AgentHarnessError('input-validation', 'Session agent is not configured.', 500)
+  }
+
+  const resolved = await resolveAgentBySlug({ req, slug: agent.slug })
+
+  if (!resolved.agent.streamingEnabled) {
+    throw new AgentHarnessError('input-validation', 'Streaming is not enabled for this agent.', 400)
+  }
+
+  const maxInputBytes =
+    typeof resolved.agent.maxInputBytes === 'number' ? resolved.agent.maxInputBytes : 20000
+  const text = assertTextInput(body.text, maxInputBytes)
+  const requestID = randomUUID()
+  const startedAt = new Date()
+  const sequence = await getNextSequence(req, sessionID)
+
+  await assertRunCapacity({
+    agent: resolved.agent,
+    agentID: String(resolved.agent.id),
+    req,
+    sessionID,
+  })
+
+  const run = await req.payload.create({
+    collection: 'agent-runs',
+    data: {
+      agent: String(resolved.agent.id),
+      inputPreview: toPreview(text),
+      requestID,
+      session: sessionID,
+      startedAt: startedAt.toISOString(),
+      status: 'running',
+      user: req.user.id,
+    },
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  await req.payload.create({
+    collection: 'agent-messages',
+    data: {
+      content: text,
+      createdBy: req.user.id,
+      role: 'user',
+      run: run.id,
+      sequence,
+      session: sessionID,
+      status: 'complete',
+    },
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  const assistantMessage = await req.payload.create({
+    collection: 'agent-messages',
+    data: {
+      content: '',
+      role: 'assistant',
+      run: run.id,
+      sequence: sequence + 1,
+      session: sessionID,
+      status: 'streaming',
+    },
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  await req.payload.update({
+    collection: 'agent-sessions',
+    data: {
+      lastMessageAt: startedAt.toISOString(),
+      lastRunAt: startedAt.toISOString(),
+      status: 'waiting',
+    },
+    id: sessionID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  const encoder = new TextEncoder()
+  const abortController = new AbortController()
+  const timeoutMS = typeof resolved.agent.timeoutMS === 'number' ? resolved.agent.timeoutMS : 30000
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    abortController.abort()
+  }, timeoutMS)
+  const requestSignal = 'signal' in req ? (req.signal as AbortSignal | undefined) : undefined
+  const abortFromClient = () => abortController.abort()
+  requestSignal?.addEventListener('abort', abortFromClient, { once: true })
+
+  let streamedExecutionID: string | undefined
+
+  const stream = new ReadableStream<Uint8Array>({
+    start: async (controller) => {
+      const emit = (event: AgentStreamEvent) => {
+        controller.enqueue(encoder.encode(encodeSSE(event)))
+      }
+
+      emit({ data: { requestID, runID: String(run.id), status: 'running' }, type: 'run' })
+      emit({
+        data: { messageID: String(assistantMessage.id), status: 'streaming' },
+        type: 'message',
+      })
+
+      try {
+        const upstream = await invokeN8nAgentStream({
+          agent: resolved.agent,
+          invocation: {
+            actor: {
+              id: req.user.id,
+              roles: Array.isArray(req.user.roleNames)
+                ? req.user.roleNames.filter((role): role is string => typeof role === 'string')
+                : [],
+            },
+            context: sanitizeContext(body.context),
+            input: {
+              data:
+                body.data && typeof body.data === 'object'
+                  ? (body.data as Record<string, unknown>)
+                  : undefined,
+              text,
+            },
+            requestID,
+            sessionID: session.externalSessionID,
+          },
+          server: resolved.server,
+          signal: abortController.signal,
+        })
+
+        const streamResult = await streamUpstreamToSSE({
+          controller,
+          emit,
+          onExecutionID: (executionID) => {
+            streamedExecutionID = executionID
+          },
+          upstream,
+        })
+        streamedExecutionID = streamResult.n8nExecutionID
+        const content = streamResult.content
+        const finishedAt = new Date()
+
+        await req.payload.update({
+          collection: 'agent-messages',
+          data: {
+            content,
+            status: 'complete',
+          },
+          id: assistantMessage.id,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        const updatedRun = await req.payload.update({
+          collection: 'agent-runs',
+          data: {
+            durationMS: finishedAt.getTime() - startedAt.getTime(),
+            finishedAt: finishedAt.toISOString(),
+            n8nExecutionID: streamedExecutionID,
+            outputPreview: toPreview(content),
+            status: 'succeeded',
+          },
+          id: run.id,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        await req.payload.update({
+          collection: 'agent-sessions',
+          data: {
+            lastMessageAt: finishedAt.toISOString(),
+            lastRunAt: finishedAt.toISOString(),
+            status: 'active',
+          },
+          id: sessionID,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        emit({
+          data: { messageID: String(assistantMessage.id), status: 'complete' },
+          type: 'message',
+        })
+        emit({ data: { runID: String(updatedRun.id), status: 'succeeded' }, type: 'done' })
+      } catch (error) {
+        const finishedAt = new Date()
+        const harnessError =
+          error instanceof AgentHarnessError
+            ? error
+            : error instanceof Error && error.name === 'AbortError'
+              ? new AgentHarnessError(
+                  timedOut ? 'upstream-timeout' : 'cancelled',
+                  timedOut ? 'The agent request timed out.' : 'The agent request was cancelled.',
+                  timedOut ? 504 : 499,
+                )
+              : new AgentHarnessError('workflow-error', 'The agent stream failed.', 502)
+        const status =
+          harnessError.code === 'upstream-timeout'
+            ? 'timed-out'
+            : harnessError.code === 'cancelled'
+              ? 'cancelled'
+              : 'failed'
+
+        if ((status === 'cancelled' || status === 'timed-out') && streamedExecutionID) {
+          await stopN8nExecution({
+            executionID: streamedExecutionID,
+            server: resolved.server,
+          }).catch((stopError) => {
+            req.payload.logger.error(
+              { err: stopError, n8nExecutionID: streamedExecutionID, requestID, runID: run.id },
+              'failed to stop n8n execution',
+            )
+          })
+        }
+
+        await req.payload.update({
+          collection: 'agent-messages',
+          data: {
+            content: harnessError.message,
+            status: 'failed',
+          },
+          id: assistantMessage.id,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        const failedRun = await req.payload.update({
+          collection: 'agent-runs',
+          data: {
+            durationMS: finishedAt.getTime() - startedAt.getTime(),
+            errorCode: harnessError.code,
+            errorMessage: harnessError.message,
+            finishedAt: finishedAt.toISOString(),
+            n8nExecutionID: streamedExecutionID,
+            status,
+          },
+          id: run.id,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        await req.payload.update({
+          collection: 'agent-sessions',
+          data: {
+            lastRunAt: finishedAt.toISOString(),
+            status: status === 'cancelled' ? 'cancelled' : 'failed',
+          },
+          id: sessionID,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        req.payload.logger.error({ err: error, requestID, runID: run.id }, 'agent stream failed')
+        emit({ data: { code: harnessError.code, message: harnessError.message }, type: 'error' })
+        emit({ data: { runID: String(failedRun.id), status }, type: 'done' })
+      } finally {
+        clearTimeout(timeout)
+        requestSignal?.removeEventListener('abort', abortFromClient)
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+      'content-type': 'text/event-stream; charset=utf-8',
+      'x-accel-buffering': 'no',
+    },
+  })
+}
+
 export const listAgentMessages = async ({
   req,
   sessionID,
@@ -332,7 +840,10 @@ export const updateRunFromCallback = async (
   },
 ) => {
   const authHeader = req.headers.get('authorization')
-  if (!process.env.N8N_CALLBACK_SECRET || authHeader !== `Bearer ${process.env.N8N_CALLBACK_SECRET}`) {
+  if (
+    !process.env.N8N_CALLBACK_SECRET ||
+    authHeader !== `Bearer ${process.env.N8N_CALLBACK_SECRET}`
+  ) {
     throw new AgentHarnessError('auth', 'Unauthorized.', 401)
   }
 

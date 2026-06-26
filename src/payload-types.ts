@@ -143,6 +143,7 @@ export interface Config {
   jobs: {
     tasks: {
       'n8n-sync': TaskN8NSync;
+      'agent-run-reconciliation': TaskAgentRunReconciliation;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -976,6 +977,14 @@ export interface Agent {
     | boolean
     | null;
   streamingEnabled?: boolean | null;
+  /**
+   * Per-user rate limit for this agent.
+   */
+  maxRunsPerMinute: number;
+  /**
+   * Per-user concurrent run limit for this agent.
+   */
+  maxConcurrentRuns: number;
   timeoutMS: number;
   maxInputBytes: number;
   welcomeMessage?: string | null;
@@ -1207,7 +1216,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'n8n-sync' | 'schedulePublish';
+        taskSlug: 'inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -1240,7 +1249,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'n8n-sync' | 'schedulePublish') | null;
+  taskSlug?: ('inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'schedulePublish') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -1772,6 +1781,8 @@ export interface AgentsSelect<T extends boolean = true> {
   inputSchema?: T;
   outputSchema?: T;
   streamingEnabled?: T;
+  maxRunsPerMinute?: T;
+  maxConcurrentRuns?: T;
   timeoutMS?: T;
   maxInputBytes?: T;
   welcomeMessage?: T;
@@ -2390,6 +2401,22 @@ export interface TaskN8NSync {
       | number
       | boolean
       | null;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskAgent-run-reconciliation".
+ */
+export interface TaskAgentRunReconciliation {
+  input: {
+    /**
+     * Optional age threshold for non-terminal runs. Defaults to five minutes.
+     */
+    staleAfterMS?: number | null;
+  };
+  output: {
+    checked?: number | null;
+    reconciled?: number | null;
   };
 }
 /**

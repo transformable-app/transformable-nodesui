@@ -26,6 +26,43 @@ export type AgentInvokeResult = {
   usage?: Record<string, unknown>
 }
 
+export type AgentStreamEvent =
+  | {
+      type: 'run'
+      data: {
+        requestID: string
+        runID: string
+        status: 'running'
+      }
+    }
+  | {
+      type: 'token'
+      data: {
+        content: string
+      }
+    }
+  | {
+      type: 'message'
+      data: {
+        messageID: string
+        status: 'complete' | 'failed' | 'streaming'
+      }
+    }
+  | {
+      type: 'error'
+      data: {
+        code: AgentErrorCode
+        message: string
+      }
+    }
+  | {
+      type: 'done'
+      data: {
+        runID: string
+        status: 'cancelled' | 'failed' | 'succeeded' | 'timed-out'
+      }
+    }
+
 export type ResolvedAgent = {
   agent: Record<string, unknown>
   server: Record<string, unknown>

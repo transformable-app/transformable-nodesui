@@ -4,6 +4,7 @@ import {
   createAgentSession,
   listAgentMessages,
   sendAgentMessage,
+  streamAgentMessage,
   updateRunFromCallback,
 } from '@/n8n/agents/invokeAgent'
 import { AgentHarnessError, type AgentRequest } from '@/n8n/agents/types'
@@ -20,6 +21,10 @@ const handleAgentError = (error: unknown): Response => {
 
   throw error
 }
+
+const wantsEventStream = (req: Parameters<Endpoint['handler']>[0]) =>
+  req.headers.get('accept')?.includes('text/event-stream') ||
+  req.headers.get('x-agent-stream') === 'true'
 
 export const agentEndpoints: Endpoint[] = [
   {
@@ -43,6 +48,13 @@ export const agentEndpoints: Endpoint[] = [
     method: 'post',
     handler: async (req) => {
       try {
+        if (wantsEventStream(req)) {
+          return streamAgentMessage({
+            req: requireUser(req),
+            sessionID: String(req.routeParams?.id ?? ''),
+          })
+        }
+
         const result = await sendAgentMessage({
           req: requireUser(req),
           sessionID: String(req.routeParams?.id ?? ''),

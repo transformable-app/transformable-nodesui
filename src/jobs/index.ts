@@ -1,3 +1,4 @@
+import { agentRunReconciliationTask } from './agentRunReconciliation'
 import { n8nSyncTask } from './n8nSync'
 
-export const tasks = [n8nSyncTask]
+export const tasks = [n8nSyncTask, agentRunReconciliationTask]
