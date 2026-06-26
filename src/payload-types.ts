@@ -73,12 +73,12 @@ export interface Config {
     workflows: Workflow;
     credentials: Credential;
     executions: Execution;
+    'data-tables': DataTable;
+    'data-table-rows': DataTableRow;
     agents: Agent;
     'agent-sessions': AgentSession;
     'agent-messages': AgentMessage;
     'agent-runs': AgentRun;
-    'data-tables': DataTable;
-    'data-table-rows': DataTableRow;
     roles: Role;
     users: User;
     forms: Form;
@@ -102,12 +102,12 @@ export interface Config {
     workflows: WorkflowsSelect<false> | WorkflowsSelect<true>;
     credentials: CredentialsSelect<false> | CredentialsSelect<true>;
     executions: ExecutionsSelect<false> | ExecutionsSelect<true>;
+    'data-tables': DataTablesSelect<false> | DataTablesSelect<true>;
+    'data-table-rows': DataTableRowsSelect<false> | DataTableRowsSelect<true>;
     agents: AgentsSelect<false> | AgentsSelect<true>;
     'agent-sessions': AgentSessionsSelect<false> | AgentSessionsSelect<true>;
     'agent-messages': AgentMessagesSelect<false> | AgentMessagesSelect<true>;
     'agent-runs': AgentRunsSelect<false> | AgentRunsSelect<true>;
-    'data-tables': DataTablesSelect<false> | DataTablesSelect<true>;
-    'data-table-rows': DataTableRowsSelect<false> | DataTableRowsSelect<true>;
     roles: RolesSelect<false> | RolesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
@@ -898,6 +898,40 @@ export interface Execution {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-table-rows".
+ */
+export interface DataTableRow {
+  id: string;
+  table: string | DataTable;
+  /**
+   * Optional stable key for sync-managed rows, for example "<server-id>:<table-id>:<row-id>".
+   */
+  sourceKey?: string | null;
+  /**
+   * Remote row identifier when available.
+   */
+  rowID?: string | null;
+  rowIndex?: number | null;
+  /**
+   * Plain object keyed by the parent table column names.
+   */
+  data:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  lastSeenAt?: string | null;
+  remoteCreatedAt?: string | null;
+  remoteUpdatedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agents".
  */
 export interface Agent {
@@ -1089,40 +1123,6 @@ export interface AgentRun {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "data-table-rows".
- */
-export interface DataTableRow {
-  id: string;
-  table: string | DataTable;
-  /**
-   * Optional stable key for sync-managed rows, for example "<server-id>:<table-id>:<row-id>".
-   */
-  sourceKey?: string | null;
-  /**
-   * Remote row identifier when available.
-   */
-  rowID?: string | null;
-  rowIndex?: number | null;
-  /**
-   * Plain object keyed by the parent table column names.
-   */
-  data:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  lastSeenAt?: string | null;
-  remoteCreatedAt?: string | null;
-  remoteUpdatedAt?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
 export interface FormSubmission {
@@ -1288,6 +1288,14 @@ export interface PayloadLockedDocument {
         value: string | Execution;
       } | null)
     | ({
+        relationTo: 'data-tables';
+        value: string | DataTable;
+      } | null)
+    | ({
+        relationTo: 'data-table-rows';
+        value: string | DataTableRow;
+      } | null)
+    | ({
         relationTo: 'agents';
         value: string | Agent;
       } | null)
@@ -1302,14 +1310,6 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'agent-runs';
         value: string | AgentRun;
-      } | null)
-    | ({
-        relationTo: 'data-tables';
-        value: string | DataTable;
-      } | null)
-    | ({
-        relationTo: 'data-table-rows';
-        value: string | DataTableRow;
       } | null)
     | ({
         relationTo: 'roles';
@@ -1704,6 +1704,56 @@ export interface ExecutionsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-tables_select".
+ */
+export interface DataTablesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  sourceKey?: T;
+  tableID?: T;
+  server?: T;
+  projectID?: T;
+  scope?: T;
+  description?: T;
+  sourcePath?: T;
+  columns?:
+    | T
+    | {
+        name?: T;
+        type?: T;
+        columnID?: T;
+        index?: T;
+        displayName?: T;
+        key?: T;
+        label?: T;
+        id?: T;
+      };
+  rowCount?: T;
+  lastRefreshedAt?: T;
+  remoteCreatedAt?: T;
+  remoteUpdatedAt?: T;
+  lastSeenAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-table-rows_select".
+ */
+export interface DataTableRowsSelect<T extends boolean = true> {
+  table?: T;
+  sourceKey?: T;
+  rowID?: T;
+  rowIndex?: T;
+  data?: T;
+  lastSeenAt?: T;
+  remoteCreatedAt?: T;
+  remoteUpdatedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agents_select".
  */
 export interface AgentsSelect<T extends boolean = true> {
@@ -1794,56 +1844,6 @@ export interface AgentRunsSelect<T extends boolean = true> {
         comment?: T;
         submittedAt?: T;
       };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "data-tables_select".
- */
-export interface DataTablesSelect<T extends boolean = true> {
-  name?: T;
-  slug?: T;
-  sourceKey?: T;
-  tableID?: T;
-  server?: T;
-  projectID?: T;
-  scope?: T;
-  description?: T;
-  sourcePath?: T;
-  columns?:
-    | T
-    | {
-        name?: T;
-        type?: T;
-        columnID?: T;
-        index?: T;
-        displayName?: T;
-        key?: T;
-        label?: T;
-        id?: T;
-      };
-  rowCount?: T;
-  lastRefreshedAt?: T;
-  remoteCreatedAt?: T;
-  remoteUpdatedAt?: T;
-  lastSeenAt?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "data-table-rows_select".
- */
-export interface DataTableRowsSelect<T extends boolean = true> {
-  table?: T;
-  sourceKey?: T;
-  rowID?: T;
-  rowIndex?: T;
-  data?: T;
-  lastSeenAt?: T;
-  remoteCreatedAt?: T;
-  remoteUpdatedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -29,6 +29,7 @@ import { AdminSettingsRefreshProvider as AdminSettingsRefreshProvider_dbbd7027b4
 import { SentryInitProvider as SentryInitProvider_53bedb65fdb1a7ea7092d849073f79b1 } from '@/components/Admin/SentryInitProvider'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
+/** @type import('payload').ImportMap */
 export const importMap = {
   "@payloadcms/plugin-seo/client#OverviewComponent": OverviewComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/plugin-seo/client#MetaTitleComponent": MetaTitleComponent_a8a977ebc872c5d5ea7ee689724c0860,
