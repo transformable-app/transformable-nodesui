@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildChatTriggerBody, parseChatTriggerResponse } from '@/n8n/agents/chatTriggerAdapter'
-import { buildAgentEndpoint } from '@/n8n/agents/buildEndpoint'
+import { assertSameServerURL, buildAgentEndpoint } from '@/n8n/agents/buildEndpoint'
 import { buildWebhookBody, parseWebhookResponse } from '@/n8n/agents/webhookAdapter'
 import type { AgentInvocation } from '@/n8n/agents/types'
 
@@ -71,5 +71,23 @@ describe('agent transport adapters', () => {
         endpointPath: '/webhook-test/agent',
       }),
     ).toThrow('production trigger')
+  })
+
+  it('allows approval resume URLs on the configured n8n server', () => {
+    expect(
+      assertSameServerURL({
+        baseURL: 'https://n8n.example.com',
+        targetURL: 'https://n8n.example.com/webhook-waiting/resume/abc',
+      }).href,
+    ).toBe('https://n8n.example.com/webhook-waiting/resume/abc')
+  })
+
+  it('rejects approval resume URLs on another origin', () => {
+    expect(() =>
+      assertSameServerURL({
+        baseURL: 'https://n8n.example.com',
+        targetURL: 'https://attacker.example.com/webhook-waiting/resume/abc',
+      }),
+    ).toThrow('configured server')
   })
 })

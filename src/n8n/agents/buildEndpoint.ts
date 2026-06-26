@@ -77,3 +77,40 @@ export const buildAgentEndpoint = ({
 
   return endpoint
 }
+
+export const assertSameServerURL = ({
+  baseURL,
+  targetURL,
+}: {
+  baseURL: unknown
+  targetURL: unknown
+}): URL => {
+  if (typeof targetURL !== 'string' || targetURL.trim().length === 0) {
+    throw new AgentHarnessError('input-validation', 'Target URL is not configured.', 500)
+  }
+
+  const base = buildAgentEndpoint({ baseURL, endpointPath: '/' })
+  const target = new URL(targetURL)
+
+  if (target.username || target.password) {
+    throw new AgentHarnessError('input-validation', 'Target URL cannot include credentials.', 500)
+  }
+
+  if (target.origin !== base.origin) {
+    throw new AgentHarnessError(
+      'input-validation',
+      'Target URL must stay on the configured server.',
+      500,
+    )
+  }
+
+  if (target.protocol !== base.protocol) {
+    throw new AgentHarnessError(
+      'input-validation',
+      'Target URL protocol must match the server.',
+      500,
+    )
+  }
+
+  return target
+}

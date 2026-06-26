@@ -91,21 +91,28 @@ export const agentRetentionTask: TaskConfig<AgentRetentionTask> = {
     }
 
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
-    const oldRecordWhere = { createdAt: { less_than: cutoff } }
-    const deletedMessages = await deleteWhere({
-      collection: 'agent-messages',
-      payload: req.payload,
-      where: oldRecordWhere,
-    })
+    const oldTerminalWhere: Where = {
+      and: [
+        { createdAt: { less_than: cutoff } },
+        { status: { in: ['succeeded', 'failed', 'timed-out', 'cancelled'] } },
+      ],
+    }
+    const oldClosedSessionWhere: Where = {
+      and: [
+        { createdAt: { less_than: cutoff } },
+        { status: { in: ['completed', 'failed', 'cancelled'] } },
+      ],
+    }
+    const deletedMessages = 0
     const deletedRuns = await deleteWhere({
       collection: 'agent-runs',
       payload: req.payload,
-      where: oldRecordWhere,
+      where: oldTerminalWhere,
     })
     const deletedSessions = await deleteWhere({
       collection: 'agent-sessions',
       payload: req.payload,
-      where: oldRecordWhere,
+      where: oldClosedSessionWhere,
     })
 
     return {

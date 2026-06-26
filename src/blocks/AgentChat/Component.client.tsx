@@ -1,6 +1,16 @@
 'use client'
 
-import { Loader2, MessageSquareText, RotateCcw, Send, Star, Square } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  Loader2,
+  MessageSquareText,
+  RotateCcw,
+  Send,
+  Star,
+  Square,
+  X,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -32,6 +42,14 @@ type RunState = {
 type AgentSession = {
   id: string
   lastMessageAt?: string | null
+  status?: string | null
+  title?: string | null
+}
+
+type AgentApproval = {
+  expiresAt?: string | null
+  id: string
+  prompt?: string | null
   status?: string | null
   title?: string | null
 }
@@ -71,7 +89,10 @@ const initialMessages = (agent: AgentSummary): AgentMessage[] =>
 export function AgentChatClient({ agent, description, title }: Props) {
   const [sessionID, setSessionID] = useState<string | null>(null)
   const [messages, setMessages] = useState<AgentMessage[]>(() => initialMessages(agent))
+  const [messagePage, setMessagePage] = useState(1)
+  const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [sessions, setSessions] = useState<AgentSession[]>([])
+  const [approvals, setApprovals] = useState<AgentApproval[]>([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -116,21 +137,42 @@ export function AgentChatClient({ agent, description, title }: Props) {
   }, [agent.slug, sessionID])
 
   const loadHistory = useCallback(
-    async (id: string) => {
-      const response = await fetch(`/api/agent-sessions/${id}/messages`)
+    async (id: string, page = 1) => {
+      const response = await fetch(`/api/agent-sessions/${id}/messages?page=${page}`)
       if (!response.ok) return
 
-      const data = (await response.json()) as { docs?: AgentMessage[] }
+      const data = (await response.json()) as {
+        docs?: AgentMessage[]
+        hasNextPage?: boolean
+        nextPage?: number | null
+        page?: number
+      }
       if (Array.isArray(data.docs)) {
-        setMessages(data.docs.length > 0 ? data.docs : initialMessages(agent))
+        setMessagePage(data.page || page)
+        setHasOlderMessages(Boolean(data.hasNextPage && data.nextPage))
+        setMessages((current) => {
+          if (page > 1) return [...data.docs!, ...current]
+          return data.docs!.length > 0 ? data.docs! : initialMessages(agent)
+        })
       }
     },
     [agent],
   )
 
+  const loadApprovals = useCallback(async (id: string) => {
+    const response = await fetch(`/api/agent-sessions/${id}/approvals`)
+    if (!response.ok) return
+
+    const data = (await response.json()) as { docs?: AgentApproval[] }
+    setApprovals(Array.isArray(data.docs) ? data.docs : [])
+  }, [])
+
   useEffect(() => {
-    if (sessionID) void loadHistory(sessionID)
-  }, [loadHistory, sessionID])
+    if (!sessionID) return
+    setMessagePage(1)
+    void loadHistory(sessionID)
+    void loadApprovals(sessionID)
+  }, [loadApprovals, loadHistory, sessionID])
 
   useEffect(() => {
     void loadSessions()
@@ -189,6 +231,7 @@ export function AgentChatClient({ agent, description, title }: Props) {
           if (!response.ok) throw new Error(data.error || 'The agent request failed.')
 
           if (data.run?.id) setActiveRun({ id: data.run.id, status: data.run.status })
+          if (data.run?.status === 'waiting') void loadApprovals(id)
           if (data.assistantMessage?.content) {
             setMessages((current) => [
               ...current,
@@ -269,6 +312,7 @@ export function AgentChatClient({ agent, description, title }: Props) {
                 status:
                   typeof parsed.data.status === 'string' ? parsed.data.status : current?.status,
               }))
+              if (parsed.data.status === 'waiting') void loadApprovals(id)
             }
           }
         }
@@ -303,6 +347,24 @@ export function AgentChatClient({ agent, description, title }: Props) {
       headers: { 'content-type': 'application/json' },
       method: 'POST',
     }).catch(() => null)
+  }
+
+  const resolveApproval = async (approvalID: string, approved: boolean) => {
+    setError(null)
+    const response = await fetch(`/api/agent-approvals/${approvalID}/resolve`, {
+      body: JSON.stringify({ approved }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    const data = (await response.json().catch(() => ({}))) as { error?: string }
+
+    if (!response.ok) {
+      setError(data.error || 'Could not resolve approval.')
+      return
+    }
+
+    setApprovals((current) => current.filter((approval) => approval.id !== approvalID))
+    if (sessionID) void loadHistory(sessionID)
   }
 
   const canRetry = useMemo(() => Boolean(lastPromptRef.current && !isSending), [isSending])
@@ -356,6 +418,18 @@ export function AgentChatClient({ agent, description, title }: Props) {
           ) : null}
 
           <div className="flex h-[28rem] flex-col gap-3 overflow-y-auto rounded-lg border bg-background p-3">
+            {hasOlderMessages ? (
+              <Button
+                className="mx-auto"
+                onClick={() => sessionID && void loadHistory(sessionID, messagePage + 1)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                <ChevronLeft className="mr-2 h-4 w-4 rotate-90" />
+                Older messages
+              </Button>
+            ) : null}
             {messages.map((message, index) => (
               <div
                 className={
@@ -375,6 +449,45 @@ export function AgentChatClient({ agent, description, title }: Props) {
               </div>
             ) : null}
           </div>
+
+          {approvals.length > 0 ? (
+            <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+              {approvals.map((approval) => (
+                <div
+                  className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
+                  key={approval.id}
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {approval.title || 'Approval required'}
+                    </p>
+                    {approval.prompt ? (
+                      <p className="text-sm text-muted-foreground">{approval.prompt}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      onClick={() => void resolveApproval(approval.id, false)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
+                    <Button
+                      onClick={() => void resolveApproval(approval.id, true)}
+                      size="sm"
+                      type="button"
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      Approve
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {error ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">

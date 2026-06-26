@@ -1044,7 +1044,7 @@ export interface AgentApproval {
   run: string | AgentRun;
   session: string | AgentSession;
   user: string | User;
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  status: 'pending' | 'consuming' | 'approved' | 'rejected' | 'expired' | 'failed';
   prompt?: string | null;
   resumeURL?: string | null;
   responsePayload?:
@@ -1056,6 +1056,7 @@ export interface AgentApproval {
     | number
     | boolean
     | null;
+  resolvedBy?: (string | null) | User;
   expiresAt: string;
   consumedAt?: string | null;
   updatedAt: string;
@@ -1069,12 +1070,14 @@ export interface AgentRun {
   id: string;
   requestID: string;
   idempotencyKey?: string | null;
+  sessionActiveLock?: string | null;
   agent: string | Agent;
   session: string | AgentSession;
   user: string | User;
   status: 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'timed-out' | 'cancelled';
   startedAt?: string | null;
   finishedAt?: string | null;
+  firstByteMS?: number | null;
   durationMS?: number | null;
   n8nExecutionID?: string | null;
   execution?: (string | null) | Execution;
@@ -1942,6 +1945,7 @@ export interface AgentApprovalsSelect<T extends boolean = true> {
   prompt?: T;
   resumeURL?: T;
   responsePayload?: T;
+  resolvedBy?: T;
   expiresAt?: T;
   consumedAt?: T;
   updatedAt?: T;
@@ -2025,12 +2029,14 @@ export interface AgentMessagesSelect<T extends boolean = true> {
 export interface AgentRunsSelect<T extends boolean = true> {
   requestID?: T;
   idempotencyKey?: T;
+  sessionActiveLock?: T;
   agent?: T;
   session?: T;
   user?: T;
   status?: T;
   startedAt?: T;
   finishedAt?: T;
+  firstByteMS?: T;
   durationMS?: T;
   n8nExecutionID?: T;
   execution?: T;

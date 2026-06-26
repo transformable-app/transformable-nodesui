@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import * as Sentry from '@sentry/nextjs'
 
+import { assertSameServerURL } from './buildEndpoint'
 import { getRelationshipID, resolveAgentBySlug } from './resolveAgent'
 import { invokeN8nAgent, invokeN8nAgentStream, stopN8nExecution } from './adapters'
 import { redactValue, toPreview } from './redact'
@@ -42,6 +43,111 @@ const assertTextInput = (value: unknown, maxBytes: number): string => {
   return value
 }
 
+const getObjectInput = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined
+
+const schemaTypeMatches = (value: unknown, type: string) => {
+  if (type === 'array') return Array.isArray(value)
+  if (type === 'integer') return typeof value === 'number' && Number.isInteger(value)
+  if (type === 'number') return typeof value === 'number' && Number.isFinite(value)
+  if (type === 'object') return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+  if (type === 'null') return value === null
+  return typeof value === type
+}
+
+const validateJSONSchemaValue = ({
+  path,
+  schema,
+  value,
+}: {
+  path: string
+  schema: Record<string, unknown>
+  value: unknown
+}) => {
+  const schemaType = schema.type
+  const types = Array.isArray(schemaType)
+    ? schemaType.filter((type): type is string => typeof type === 'string')
+    : typeof schemaType === 'string'
+      ? [schemaType]
+      : []
+
+  if (types.length > 0 && !types.some((type) => schemaTypeMatches(value, type))) {
+    throw new AgentHarnessError(
+      'input-validation',
+      `${path} does not match the configured schema.`,
+      400,
+    )
+  }
+
+  if (Array.isArray(schema.enum) && !schema.enum.some((item) => Object.is(item, value))) {
+    throw new AgentHarnessError('input-validation', `${path} is not an allowed value.`, 400)
+  }
+
+  if (schema.type === 'object' || (value && typeof value === 'object' && !Array.isArray(value))) {
+    const objectValue = getObjectInput(value)
+    if (!objectValue) return
+
+    const required = Array.isArray(schema.required)
+      ? schema.required.filter((field): field is string => typeof field === 'string')
+      : []
+    for (const field of required) {
+      if (!(field in objectValue)) {
+        throw new AgentHarnessError('input-validation', `${path}.${field} is required.`, 400)
+      }
+    }
+
+    const properties = getObjectInput(schema.properties)
+    if (!properties) return
+
+    for (const [key, childSchema] of Object.entries(properties)) {
+      if (!(key in objectValue) || !getObjectInput(childSchema)) continue
+      validateJSONSchemaValue({
+        path: `${path}.${key}`,
+        schema: childSchema as Record<string, unknown>,
+        value: objectValue[key],
+      })
+    }
+  }
+
+  if (schema.type === 'array' && Array.isArray(value) && getObjectInput(schema.items)) {
+    value.forEach((item, index) =>
+      validateJSONSchemaValue({
+        path: `${path}[${index}]`,
+        schema: schema.items as Record<string, unknown>,
+        value: item,
+      }),
+    )
+  }
+}
+
+const validateConfiguredSchema = ({
+  label,
+  schema,
+  value,
+}: {
+  label: string
+  schema: unknown
+  value: unknown
+}) => {
+  const schemaObject = getObjectInput(schema)
+  if (!schemaObject) return
+
+  validateJSONSchemaValue({ path: label, schema: schemaObject, value })
+}
+
+const getStructuredInput = (body: Record<string, unknown>, agent: Record<string, unknown>) => {
+  const data = getObjectInput(body.data)
+
+  if (agent.inputMode === 'structured' && !data) {
+    throw new AgentHarnessError('input-validation', 'Structured input data is required.', 400)
+  }
+
+  validateConfiguredSchema({ label: 'input', schema: agent.inputSchema, value: data ?? {} })
+  return data
+}
+
 const sanitizeContext = (value: unknown): Record<string, unknown> | undefined => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
 
@@ -73,6 +179,21 @@ const getNextSequence = async (req: AgentRequest, sessionID: string): Promise<nu
 const isTerminalRunStatus = (status: unknown): status is (typeof TERMINAL_RUN_STATUSES)[number] =>
   typeof status === 'string' &&
   TERMINAL_RUN_STATUSES.includes(status as (typeof TERMINAL_RUN_STATUSES)[number])
+
+const isUniqueConstraintError = (error: unknown) =>
+  error instanceof Error &&
+  (error.message.includes('duplicate key') ||
+    error.message.includes('E11000') ||
+    error.message.includes('unique'))
+
+const toCapacityError = (error: unknown) => {
+  if (!isUniqueConstraintError(error)) throw error
+  throw new AgentHarnessError(
+    'rate-limited',
+    'This session already has a message in progress.',
+    409,
+  )
+}
 
 const getRunState = async (req: AgentRequest, runID: string) =>
   req.payload.findByID({
@@ -276,7 +397,7 @@ const streamUpstreamToSSE = async ({
   emit: (event: AgentStreamEvent) => void
   onExecutionID?: (executionID: string) => void
   upstream: Response
-}): Promise<{ content: string; n8nExecutionID?: string }> => {
+}): Promise<{ content: string; firstByteAt?: number; n8nExecutionID?: string }> => {
   const reader = upstream.body?.getReader()
   if (!reader)
     throw new AgentHarnessError('malformed-response', 'n8n returned an empty stream.', 502)
@@ -286,9 +407,11 @@ const streamUpstreamToSSE = async ({
   let buffer = ''
   let assembled = ''
   let n8nExecutionID: string | undefined
+  let firstByteAt: number | undefined
 
   const emitToken = (content: string) => {
     if (!content) return
+    firstByteAt ??= Date.now()
     assembled += content
     emit({ data: { content }, type: 'token' })
   }
@@ -343,7 +466,7 @@ const streamUpstreamToSSE = async ({
   }
 
   controller.enqueue(new TextEncoder().encode(': stream closed\n\n'))
-  return { content: assembled, n8nExecutionID }
+  return { content: assembled, firstByteAt, n8nExecutionID }
 }
 
 const streamExistingRun = (run: {
@@ -455,6 +578,7 @@ export const sendAgentMessage = async ({
   const maxInputBytes =
     typeof resolved.agent.maxInputBytes === 'number' ? resolved.agent.maxInputBytes : 20000
   const text = assertTextInput(body.text, maxInputBytes)
+  const structuredInput = getStructuredInput(body, resolved.agent)
   const requestID = randomUUID()
   const startedAt = new Date()
   const idempotencyKey =
@@ -488,22 +612,25 @@ export const sendAgentMessage = async ({
     sessionID,
   })
 
-  const run = await req.payload.create({
-    collection: 'agent-runs',
-    data: {
-      agent: String(resolved.agent.id),
-      idempotencyKey,
-      inputPreview: toPreview(text),
-      requestID,
-      session: sessionID,
-      startedAt: startedAt.toISOString(),
-      status: 'running',
-      user: req.user.id,
-    },
-    overrideAccess: false,
-    req,
-    user: req.user,
-  })
+  const run = await req.payload
+    .create({
+      collection: 'agent-runs',
+      data: {
+        agent: String(resolved.agent.id),
+        idempotencyKey,
+        inputPreview: toPreview(text),
+        requestID,
+        session: sessionID,
+        sessionActiveLock: sessionID,
+        startedAt: startedAt.toISOString(),
+        status: 'running',
+        user: req.user.id,
+      },
+      overrideAccess: false,
+      req,
+      user: req.user,
+    })
+    .catch(toCapacityError)
 
   const userMessage = await req.payload.create({
     collection: 'agent-messages',
@@ -533,10 +660,7 @@ export const sendAgentMessage = async ({
         },
         context: sanitizeContext(body.context),
         input: {
-          data:
-            body.data && typeof body.data === 'object'
-              ? (body.data as Record<string, unknown>)
-              : undefined,
+          data: structuredInput,
           text,
         },
         requestID,
@@ -547,6 +671,11 @@ export const sendAgentMessage = async ({
 
     const finishedAt = new Date()
     const status = response.status === 'waiting' ? 'waiting' : 'succeeded'
+    validateConfiguredSchema({
+      label: 'output',
+      schema: resolved.agent.outputSchema,
+      value: response.data ?? { content: response.content },
+    })
 
     if (!(await isRunStillWritable(req, String(run.id)))) {
       return { run: await getRunState(req, String(run.id)), userMessage }
@@ -573,8 +702,10 @@ export const sendAgentMessage = async ({
       data: {
         durationMS: finishedAt.getTime() - startedAt.getTime(),
         finishedAt: status === 'succeeded' ? finishedAt.toISOString() : undefined,
+        firstByteMS: finishedAt.getTime() - startedAt.getTime(),
         n8nExecutionID: response.n8nExecutionID,
         outputPreview: toPreview(response.content),
+        sessionActiveLock: status === 'waiting' ? sessionID : null,
         status,
         usage: asPayloadJSON(response.usage ? redactValue(response.usage) : undefined),
       },
@@ -620,6 +751,7 @@ export const sendAgentMessage = async ({
         errorCode: harnessError.code,
         errorMessage: harnessError.message,
         finishedAt: finishedAt.toISOString(),
+        sessionActiveLock: `released:${run.id}`,
         status: harnessError.code === 'upstream-timeout' ? 'timed-out' : 'failed',
       },
       id: run.id,
@@ -684,6 +816,7 @@ export const streamAgentMessage = async ({
   const maxInputBytes =
     typeof resolved.agent.maxInputBytes === 'number' ? resolved.agent.maxInputBytes : 20000
   const text = assertTextInput(body.text, maxInputBytes)
+  const structuredInput = getStructuredInput(body, resolved.agent)
   const requestID = randomUUID()
   const startedAt = new Date()
   const idempotencyKey =
@@ -718,22 +851,25 @@ export const streamAgentMessage = async ({
     sessionID,
   })
 
-  const run = await req.payload.create({
-    collection: 'agent-runs',
-    data: {
-      agent: String(resolved.agent.id),
-      idempotencyKey,
-      inputPreview: toPreview(text),
-      requestID,
-      session: sessionID,
-      startedAt: startedAt.toISOString(),
-      status: 'running',
-      user: req.user.id,
-    },
-    overrideAccess: false,
-    req,
-    user: req.user,
-  })
+  const run = await req.payload
+    .create({
+      collection: 'agent-runs',
+      data: {
+        agent: String(resolved.agent.id),
+        idempotencyKey,
+        inputPreview: toPreview(text),
+        requestID,
+        session: sessionID,
+        sessionActiveLock: sessionID,
+        startedAt: startedAt.toISOString(),
+        status: 'running',
+        user: req.user.id,
+      },
+      overrideAccess: false,
+      req,
+      user: req.user,
+    })
+    .catch(toCapacityError)
 
   await req.payload.create({
     collection: 'agent-messages',
@@ -817,10 +953,7 @@ export const streamAgentMessage = async ({
             },
             context: sanitizeContext(body.context),
             input: {
-              data:
-                body.data && typeof body.data === 'object'
-                  ? (body.data as Record<string, unknown>)
-                  : undefined,
+              data: structuredInput,
               text,
             },
             requestID,
@@ -841,6 +974,11 @@ export const streamAgentMessage = async ({
         streamedExecutionID = streamResult.n8nExecutionID
         const content = streamResult.content
         const finishedAt = new Date()
+        validateConfiguredSchema({
+          label: 'output',
+          schema: resolved.agent.outputSchema,
+          value: { content },
+        })
 
         if (!(await isRunStillWritable(req, String(run.id)))) {
           emit({ data: { runID: String(run.id), status: 'cancelled' }, type: 'done' })
@@ -864,8 +1002,12 @@ export const streamAgentMessage = async ({
           data: {
             durationMS: finishedAt.getTime() - startedAt.getTime(),
             finishedAt: finishedAt.toISOString(),
+            firstByteMS: streamResult.firstByteAt
+              ? streamResult.firstByteAt - startedAt.getTime()
+              : undefined,
             n8nExecutionID: streamedExecutionID,
             outputPreview: toPreview(content),
+            sessionActiveLock: `released:${run.id}`,
             status: 'succeeded',
           },
           id: run.id,
@@ -953,6 +1095,7 @@ export const streamAgentMessage = async ({
             errorMessage: harnessError.message,
             finishedAt: finishedAt.toISOString(),
             n8nExecutionID: streamedExecutionID,
+            sessionActiveLock: `released:${run.id}`,
             status,
           },
           id: run.id,
@@ -999,9 +1142,11 @@ export const streamAgentMessage = async ({
 }
 
 export const listAgentMessages = async ({
+  page = 1,
   req,
   sessionID,
 }: {
+  page?: number
   req: AgentRequest
   sessionID: string
 }) => {
@@ -1019,6 +1164,7 @@ export const listAgentMessages = async ({
     depth: 1,
     limit: 50,
     overrideAccess: false,
+    page,
     req,
     sort: 'sequence',
     user: req.user,
@@ -1026,6 +1172,36 @@ export const listAgentMessages = async ({
       session: {
         equals: sessionID,
       },
+    },
+  })
+}
+
+export const listAgentApprovals = async ({
+  req,
+  sessionID,
+}: {
+  req: AgentRequest
+  sessionID: string
+}) => {
+  await req.payload.findByID({
+    collection: 'agent-sessions',
+    depth: 0,
+    id: sessionID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  return req.payload.find({
+    collection: 'agent-approvals',
+    depth: 1,
+    limit: 10,
+    overrideAccess: false,
+    req,
+    sort: 'expiresAt',
+    user: req.user,
+    where: {
+      and: [{ session: { equals: sessionID } }, { status: { equals: 'pending' } }],
     },
   })
 }
@@ -1072,6 +1248,7 @@ export const cancelAgentRun = async ({ req, runID }: { req: AgentRequest; runID:
       errorCode: 'cancelled',
       errorMessage: 'Run was cancelled by the user.',
       finishedAt,
+      sessionActiveLock: `released:${runID}`,
       status: 'cancelled',
     },
     id: runID,
@@ -1134,9 +1311,21 @@ export const resolveAgentApproval = async ({
     })
   }
 
+  const consumingApproval = await req.payload.update({
+    collection: 'agent-approvals',
+    data: {
+      resolvedBy: req.user.id,
+      status: 'consuming',
+    },
+    id: approvalID,
+    overrideAccess: true,
+  })
+
+  if (consumingApproval.status !== 'consuming') return consumingApproval
+
   const approval = await req.payload.findByID({
     collection: 'agent-approvals',
-    depth: 0,
+    depth: 2,
     id: approvalID,
     overrideAccess: true,
   })
@@ -1145,23 +1334,53 @@ export const resolveAgentApproval = async ({
     throw new AgentHarnessError('input-validation', 'Approval resume URL is not configured.', 500)
   }
 
-  await fetch(approval.resumeURL, {
-    body: JSON.stringify({
-      approved,
-      data: responsePayload ?? {},
-    }),
-    headers: {
-      'content-type': 'application/json',
-    },
-    method: 'POST',
-    redirect: 'error',
+  const agent = approval.agent
+  if (!agent || typeof agent !== 'object') {
+    throw new AgentHarnessError('input-validation', 'Approval agent is not configured.', 500)
+  }
+  const server = await getSystemServerForAgent({
+    agent: agent as unknown as Record<string, unknown>,
+    req,
   })
+  if (!server) {
+    throw new AgentHarnessError('input-validation', 'Approval agent server is not configured.', 500)
+  }
+
+  const resumeURL = assertSameServerURL({
+    baseURL: (server as unknown as Record<string, unknown>).url,
+    targetURL: approval.resumeURL,
+  })
+
+  try {
+    await fetch(resumeURL, {
+      body: JSON.stringify({
+        approved,
+        data: responsePayload ?? {},
+      }),
+      headers: {
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+      redirect: 'error',
+    })
+  } catch (error) {
+    await req.payload.update({
+      collection: 'agent-approvals',
+      data: {
+        status: 'failed',
+      },
+      id: approvalID,
+      overrideAccess: true,
+    })
+    throw error
+  }
 
   return req.payload.update({
     collection: 'agent-approvals',
     data: {
       consumedAt: new Date().toISOString(),
       responsePayload: asPayloadJSON(responsePayload),
+      resolvedBy: req.user.id,
       status: approved ? 'approved' : 'rejected',
     },
     id: approvalID,
@@ -1234,6 +1453,32 @@ export const updateRunFromCallback = async (
     }
 
     if (agentID && sessionID && userID && typeof approval.resumeURL === 'string') {
+      const existingApproval = await req.payload.find({
+        collection: 'agent-approvals',
+        depth: 0,
+        limit: 1,
+        overrideAccess: true,
+        where: {
+          and: [{ run: { equals: run.id } }, { status: { in: ['pending', 'consuming'] } }],
+        },
+      })
+
+      if (existingApproval.docs[0]) return run
+
+      const runAgent = run.agent
+      if (runAgent && typeof runAgent === 'object') {
+        const server = await getSystemServerForAgent({
+          agent: runAgent as unknown as Record<string, unknown>,
+          req,
+        })
+        if (server) {
+          assertSameServerURL({
+            baseURL: (server as unknown as Record<string, unknown>).url,
+            targetURL: approval.resumeURL,
+          })
+        }
+      }
+
       await req.payload.create({
         collection: 'agent-approvals',
         data: {
@@ -1262,6 +1507,21 @@ export const updateRunFromCallback = async (
   const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : finishedAt.getTime()
   const content = typeof body.content === 'string' ? body.content : toPreview(body.output ?? body)
   const sessionID = getRelationshipID(run.session)
+  const agentID = getRelationshipID(run.agent)
+
+  if (status === 'succeeded' && agentID) {
+    const agent = await req.payload.findByID({
+      collection: 'agents',
+      depth: 0,
+      id: agentID,
+      overrideAccess: true,
+    })
+    validateConfiguredSchema({
+      label: 'output',
+      schema: agent.outputSchema,
+      value: body.data ?? body.output ?? { content },
+    })
+  }
 
   const updatedRun = await req.payload.update({
     collection: 'agent-runs',
@@ -1270,8 +1530,10 @@ export const updateRunFromCallback = async (
       errorCode: typeof body.errorCode === 'string' ? body.errorCode : undefined,
       errorMessage: typeof body.errorMessage === 'string' ? body.errorMessage : undefined,
       finishedAt: finishedAt.toISOString(),
+      firstByteMS: typeof body.firstByteMS === 'number' ? body.firstByteMS : undefined,
       n8nExecutionID: typeof body.n8nExecutionID === 'string' ? body.n8nExecutionID : undefined,
       outputPreview: toPreview(content),
+      sessionActiveLock: `released:${run.id}`,
       status,
       usage: asPayloadJSON(
         body.usage && typeof body.usage === 'object' ? redactValue(body.usage) : undefined,
