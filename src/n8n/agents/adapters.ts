@@ -8,6 +8,16 @@ const resolveSecret = (secretReference: unknown): string | null => {
   return process.env[secretReference.trim()] ?? null
 }
 
+const assertSupportedAuthStrategy = (agent: Record<string, unknown>) => {
+  if (!agent.authStrategy || agent.authStrategy === 'server-secret') return
+
+  throw new AgentHarnessError(
+    'input-validation',
+    `Agent auth strategy "${String(agent.authStrategy)}" is not implemented.`,
+    500,
+  )
+}
+
 export const invokeN8nAgent = async ({
   agent,
   invocation,
@@ -17,6 +27,8 @@ export const invokeN8nAgent = async ({
   invocation: AgentInvocation
   server: Record<string, unknown>
 }): Promise<AgentInvokeResult> => {
+  assertSupportedAuthStrategy(agent)
+
   const endpoint = buildAgentEndpoint({
     baseURL: server.baseURL,
     endpointPath: agent.endpointPath,
@@ -91,6 +103,8 @@ const resolveTransportBody = ({
 }
 
 const buildInvocationHeaders = (agent: Record<string, unknown>) => {
+  assertSupportedAuthStrategy(agent)
+
   const headers = new Headers({
     accept: 'text/event-stream, application/json, text/plain',
     'content-type': 'application/json',

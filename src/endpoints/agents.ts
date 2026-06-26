@@ -4,6 +4,8 @@ import {
   cancelAgentRun,
   createAgentSession,
   listAgentMessages,
+  listAgentSessions,
+  resolveAgentApproval,
   sendAgentMessage,
   streamAgentMessage,
   updateRunFromCallback,
@@ -39,6 +41,22 @@ export const agentEndpoints: Endpoint[] = [
         })
 
         return Response.json({ session })
+      } catch (error) {
+        return handleAgentError(error)
+      }
+    },
+  },
+  {
+    path: '/agents/:slug/sessions',
+    method: 'get',
+    handler: async (req) => {
+      try {
+        const sessions = await listAgentSessions({
+          req: requireUser(req),
+          slug: String(req.routeParams?.slug ?? ''),
+        })
+
+        return Response.json(sessions)
       } catch (error) {
         return handleAgentError(error)
       }
@@ -136,6 +154,31 @@ export const agentEndpoints: Endpoint[] = [
         })
 
         return Response.json({ run })
+      } catch (error) {
+        return handleAgentError(error)
+      }
+    },
+  },
+  {
+    path: '/agent-approvals/:id/resolve',
+    method: 'post',
+    handler: async (req) => {
+      try {
+        const userReq = requireUser(req)
+        const body = req.json
+          ? ((await req.json().catch(() => ({}))) as Record<string, unknown>)
+          : {}
+        const approval = await resolveAgentApproval({
+          approvalID: String(req.routeParams?.id ?? ''),
+          approved: body.approved !== false,
+          req: userReq,
+          responsePayload:
+            body.data && typeof body.data === 'object'
+              ? (body.data as Record<string, unknown>)
+              : undefined,
+        })
+
+        return Response.json({ approval })
       } catch (error) {
         return handleAgentError(error)
       }

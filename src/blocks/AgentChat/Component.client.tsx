@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 
 type AgentSummary = {
+  adminWorkflowURL?: string | null
   name: string
   placeholder?: string | null
   slug: string
@@ -26,6 +27,13 @@ type RunState = {
   id?: string
   requestID?: string
   status?: string
+}
+
+type AgentSession = {
+  id: string
+  lastMessageAt?: string | null
+  status?: string | null
+  title?: string | null
 }
 
 type Props = {
@@ -63,6 +71,7 @@ const initialMessages = (agent: AgentSummary): AgentMessage[] =>
 export function AgentChatClient({ agent, description, title }: Props) {
   const [sessionID, setSessionID] = useState<string | null>(null)
   const [messages, setMessages] = useState<AgentMessage[]>(() => initialMessages(agent))
+  const [sessions, setSessions] = useState<AgentSession[]>([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -89,8 +98,22 @@ export function AgentChatClient({ agent, description, title }: Props) {
     if (!data.session?.id) throw new Error('Agent session response was invalid.')
 
     setSessionID(data.session.id)
+    setSessions((current) => [data.session as AgentSession, ...current])
     return data.session.id
   }, [agent.name, agent.slug, sessionID])
+
+  const loadSessions = useCallback(async () => {
+    const response = await fetch(`/api/agents/${agent.slug}/sessions`)
+    if (!response.ok) return
+
+    const data = (await response.json()) as { docs?: AgentSession[] }
+    if (Array.isArray(data.docs)) {
+      setSessions(data.docs)
+      if (!sessionID && data.docs[0]?.id) {
+        setSessionID(data.docs[0].id)
+      }
+    }
+  }, [agent.slug, sessionID])
 
   const loadHistory = useCallback(
     async (id: string) => {
@@ -108,6 +131,10 @@ export function AgentChatClient({ agent, description, title }: Props) {
   useEffect(() => {
     if (sessionID) void loadHistory(sessionID)
   }, [loadHistory, sessionID])
+
+  useEffect(() => {
+    void loadSessions()
+  }, [loadSessions])
 
   const appendToken = (content: string) => {
     setMessages((current) => {
@@ -149,10 +176,11 @@ export function AgentChatClient({ agent, description, title }: Props) {
 
       try {
         const id = await ensureSession()
+        const idempotencyKey = crypto.randomUUID()
 
         if (!agent.streamingEnabled) {
           const response = await fetch(`/api/agent-sessions/${id}/messages`, {
-            body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), text: trimmed }),
+            body: JSON.stringify({ idempotencyKey, text: trimmed }),
             headers: { 'content-type': 'application/json' },
             method: 'POST',
           })
@@ -182,7 +210,7 @@ export function AgentChatClient({ agent, description, title }: Props) {
         abortRef.current = abortController
 
         const response = await fetch(`/api/agent-sessions/${id}/messages`, {
-          body: JSON.stringify({ text: trimmed }),
+          body: JSON.stringify({ idempotencyKey, text: trimmed }),
           headers: {
             accept: 'text/event-stream',
             'content-type': 'application/json',
@@ -290,12 +318,43 @@ export function AgentChatClient({ agent, description, title }: Props) {
 
       <Card className="overflow-hidden bg-card">
         <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-3 text-lg text-foreground">
-            <MessageSquareText className="h-5 w-5 text-primary" />
-            {agent.name}
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-3 text-lg text-foreground">
+              <MessageSquareText className="h-5 w-5 text-primary" />
+              {agent.name}
+            </CardTitle>
+            {agent.adminWorkflowURL ? (
+              <a
+                className="text-sm text-primary underline-offset-4 hover:underline"
+                href={agent.adminWorkflowURL}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open workflow
+              </a>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4 p-4">
+          {sessions.length > 0 ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {sessions.map((session) => (
+                <Button
+                  key={session.id}
+                  onClick={() => {
+                    setSessionID(session.id)
+                    setError(null)
+                  }}
+                  size="sm"
+                  type="button"
+                  variant={session.id === sessionID ? 'secondary' : 'outline'}
+                >
+                  {session.title || 'Session'}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
           <div className="flex h-[28rem] flex-col gap-3 overflow-y-auto rounded-lg border bg-background p-3">
             {messages.map((message, index) => (
               <div

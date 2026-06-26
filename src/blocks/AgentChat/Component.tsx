@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import { headers as getHeaders } from 'next/headers'
 
 import { AgentChatClient } from './Component.client'
+import { checkRole } from '@/access/utilities'
 
 type AgentRelation =
   | string
@@ -28,7 +29,7 @@ export async function AgentChatBlock({ agent, description, title }: Props) {
 
   const result = await payload.find({
     collection: 'agents',
-    depth: 0,
+    depth: 1,
     limit: 1,
     overrideAccess: false,
     pagination: false,
@@ -44,6 +45,12 @@ export async function AgentChatBlock({ agent, description, title }: Props) {
   return (
     <AgentChatClient
       agent={{
+        adminWorkflowURL:
+          checkRole(['Admin'], user) &&
+          resolvedAgent.workflow &&
+          typeof resolvedAgent.workflow === 'object'
+            ? resolvedAgent.workflow.n8nURL
+            : undefined,
         name: resolvedAgent.name,
         placeholder: resolvedAgent.placeholder,
         slug: resolvedAgent.slug,

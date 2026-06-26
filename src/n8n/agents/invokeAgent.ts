@@ -10,6 +10,7 @@ const MAX_CONTEXT_KEYS = 20
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000
 const DEFAULT_MAX_RUNS_PER_WINDOW = 12
 const DEFAULT_MAX_CONCURRENT_RUNS = 1
+const TERMINAL_RUN_STATUSES = ['succeeded', 'failed', 'timed-out', 'cancelled'] as const
 
 type JSONReadableRequest = {
   json?: () => Promise<unknown>
@@ -67,6 +68,63 @@ const getNextSequence = async (req: AgentRequest, sessionID: string): Promise<nu
 
   const latestSequence = latest.docs[0]?.sequence
   return typeof latestSequence === 'number' ? latestSequence + 1 : 1
+}
+
+const isTerminalRunStatus = (status: unknown): status is (typeof TERMINAL_RUN_STATUSES)[number] =>
+  typeof status === 'string' &&
+  TERMINAL_RUN_STATUSES.includes(status as (typeof TERMINAL_RUN_STATUSES)[number])
+
+const getRunState = async (req: AgentRequest, runID: string) =>
+  req.payload.findByID({
+    collection: 'agent-runs',
+    depth: 0,
+    id: runID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+const isRunStillWritable = async (req: AgentRequest, runID: string) => {
+  const latestRun = await getRunState(req, runID)
+  return Boolean(latestRun && !isTerminalRunStatus(latestRun.status))
+}
+
+const getSystemServerForAgent = async ({
+  agent,
+  req,
+}: {
+  agent: Record<string, unknown>
+  req: Pick<AgentRequest, 'payload'>
+}) => {
+  const serverID = getRelationshipID(agent.server)
+  if (!serverID) return null
+
+  return req.payload.findByID({
+    collection: 'servers',
+    depth: 0,
+    id: serverID,
+    overrideAccess: true,
+  })
+}
+
+const stopExecutionForAgent = async ({
+  agent,
+  executionID,
+  req,
+}: {
+  agent: Record<string, unknown>
+  executionID?: string | null
+  req: Pick<AgentRequest, 'payload'>
+}) => {
+  if (!executionID) return
+
+  const server = await getSystemServerForAgent({ agent, req })
+  if (!server) return
+
+  await stopN8nExecution({
+    executionID,
+    server: server as unknown as Record<string, unknown>,
+  })
 }
 
 const assertRunCapacity = async ({
@@ -153,6 +211,28 @@ const assertRunCapacity = async ({
   if (recentRuns.totalDocs >= maxRunsPerWindow) {
     throw new AgentHarnessError('rate-limited', 'Too many agent requests. Try again shortly.', 429)
   }
+
+  const maxRunsPerDay = typeof agent.maxRunsPerDay === 'number' ? agent.maxRunsPerDay : 100
+  const dayStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const dailyRuns = await req.payload.find({
+    collection: 'agent-runs',
+    depth: 0,
+    limit: maxRunsPerDay,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: {
+      and: [
+        { agent: { equals: agentID } },
+        { user: { equals: req.user.id } },
+        { startedAt: { greater_than: dayStart } },
+      ],
+    },
+  })
+
+  if (dailyRuns.totalDocs >= maxRunsPerDay) {
+    throw new AgentHarnessError('rate-limited', 'Daily agent quota exceeded.', 429)
+  }
 }
 
 const encodeSSE = (event: AgentStreamEvent): string =>
@@ -236,11 +316,13 @@ const streamUpstreamToSSE = async ({
 
     const chunk = decoder.decode(value, { stream: true })
 
-    if (contentType.includes('text/event-stream')) {
+    if (contentType.includes('text/event-stream') || contentType.includes('application/json')) {
       buffer += chunk
-      const frames = buffer.split(/\n\n|\r\n\r\n/)
-      buffer = frames.pop() ?? ''
-      frames.forEach(processSSEFrame)
+      if (contentType.includes('text/event-stream')) {
+        const frames = buffer.split(/\n\n|\r\n\r\n/)
+        buffer = frames.pop() ?? ''
+        frames.forEach(processSSEFrame)
+      }
     } else {
       emitToken(chunk)
     }
@@ -250,8 +332,44 @@ const streamUpstreamToSSE = async ({
     processSSEFrame(buffer)
   }
 
+  if (contentType.includes('application/json') && buffer.trim()) {
+    const payload = parseStreamPayload(buffer)
+    const executionID = extractStreamExecutionID(payload)
+    if (executionID && !n8nExecutionID) {
+      n8nExecutionID = executionID
+      onExecutionID?.(executionID)
+    }
+    emitToken(extractStreamContent(payload))
+  }
+
   controller.enqueue(new TextEncoder().encode(': stream closed\n\n'))
   return { content: assembled, n8nExecutionID }
+}
+
+const streamExistingRun = (run: {
+  id: unknown
+  requestID?: string | null
+  status?: string | null
+}) => {
+  const runID = String(run.id)
+  const status = isTerminalRunStatus(run.status) ? run.status : 'failed'
+  const body =
+    encodeSSE({
+      data: { requestID: run.requestID || '', runID, status: 'running' },
+      type: 'run',
+    }) +
+    encodeSSE({
+      data: { runID, status },
+      type: 'done',
+    })
+
+  return new Response(body, {
+    headers: {
+      'cache-control': 'no-cache, no-transform',
+      'content-type': 'text/event-stream; charset=utf-8',
+      'x-accel-buffering': 'no',
+    },
+  })
 }
 
 export const createAgentSession = async ({ req, slug }: { req: AgentRequest; slug: string }) => {
@@ -281,6 +399,25 @@ export const createAgentSession = async ({ req, slug }: { req: AgentRequest; slu
   })
 
   return session
+}
+
+export const listAgentSessions = async ({ req, slug }: { req: AgentRequest; slug: string }) => {
+  const { agent } = await resolveAgentBySlug({ req, slug })
+
+  return req.payload.find({
+    collection: 'agent-sessions',
+    depth: 0,
+    limit: 20,
+    overrideAccess: false,
+    req,
+    sort: '-lastMessageAt',
+    user: req.user,
+    where: {
+      agent: {
+        equals: String(agent.id),
+      },
+    },
+  })
 }
 
 export const sendAgentMessage = async ({
@@ -324,6 +461,10 @@ export const sendAgentMessage = async ({
     typeof body.idempotencyKey === 'string' && body.idempotencyKey.trim()
       ? `${sessionID}:${body.idempotencyKey.trim()}`
       : undefined
+
+  if (!idempotencyKey) {
+    throw new AgentHarnessError('input-validation', 'idempotencyKey is required.', 400)
+  }
 
   if (idempotencyKey) {
     const existing = await req.payload.find({
@@ -407,6 +548,10 @@ export const sendAgentMessage = async ({
     const finishedAt = new Date()
     const status = response.status === 'waiting' ? 'waiting' : 'succeeded'
 
+    if (!(await isRunStillWritable(req, String(run.id)))) {
+      return { run: await getRunState(req, String(run.id)), userMessage }
+    }
+
     const assistantMessage = await req.payload.create({
       collection: 'agent-messages',
       data: {
@@ -459,6 +604,14 @@ export const sendAgentMessage = async ({
       error instanceof AgentHarnessError
         ? error
         : new AgentHarnessError('workflow-error', 'The agent request failed.', 502)
+
+    if (!(await isRunStillWritable(req, String(run.id)))) {
+      return {
+        error: harnessError.message,
+        run: await getRunState(req, String(run.id)),
+        userMessage,
+      }
+    }
 
     const failedRun = await req.payload.update({
       collection: 'agent-runs',
@@ -533,6 +686,29 @@ export const streamAgentMessage = async ({
   const text = assertTextInput(body.text, maxInputBytes)
   const requestID = randomUUID()
   const startedAt = new Date()
+  const idempotencyKey =
+    typeof body.idempotencyKey === 'string' && body.idempotencyKey.trim()
+      ? `${sessionID}:${body.idempotencyKey.trim()}`
+      : undefined
+
+  if (!idempotencyKey) {
+    throw new AgentHarnessError('input-validation', 'idempotencyKey is required.', 400)
+  }
+
+  if (idempotencyKey) {
+    const existing = await req.payload.find({
+      collection: 'agent-runs',
+      depth: 0,
+      limit: 1,
+      overrideAccess: false,
+      req,
+      user: req.user,
+      where: { idempotencyKey: { equals: idempotencyKey } },
+    })
+
+    if (existing.docs[0]) return streamExistingRun(existing.docs[0])
+  }
+
   const sequence = await getNextSequence(req, sessionID)
 
   await assertRunCapacity({
@@ -546,6 +722,7 @@ export const streamAgentMessage = async ({
     collection: 'agent-runs',
     data: {
       agent: String(resolved.agent.id),
+      idempotencyKey,
       inputPreview: toPreview(text),
       requestID,
       session: sessionID,
@@ -665,6 +842,11 @@ export const streamAgentMessage = async ({
         const content = streamResult.content
         const finishedAt = new Date()
 
+        if (!(await isRunStillWritable(req, String(run.id)))) {
+          emit({ data: { runID: String(run.id), status: 'cancelled' }, type: 'done' })
+          return
+        }
+
         await req.payload.update({
           collection: 'agent-messages',
           data: {
@@ -730,9 +912,10 @@ export const streamAgentMessage = async ({
               : 'failed'
 
         if ((status === 'cancelled' || status === 'timed-out') && streamedExecutionID) {
-          await stopN8nExecution({
+          await stopExecutionForAgent({
+            agent: resolved.agent,
             executionID: streamedExecutionID,
-            server: resolved.server,
+            req,
           }).catch((stopError) => {
             Sentry.captureException(stopError, {
               tags: { area: 'agent-harness', requestID },
@@ -743,6 +926,11 @@ export const streamAgentMessage = async ({
               'failed to stop n8n execution',
             )
           })
+        }
+
+        if (!(await isRunStillWritable(req, String(run.id)))) {
+          emit({ data: { runID: String(run.id), status: 'cancelled' }, type: 'done' })
+          return
         }
 
         await req.payload.update({
@@ -859,12 +1047,12 @@ export const cancelAgentRun = async ({ req, runID }: { req: AgentRequest; runID:
   }
 
   const agent = run.agent
-  const server = agent && typeof agent === 'object' ? agent.server : undefined
 
-  if (run.n8nExecutionID && server && typeof server === 'object') {
-    await stopN8nExecution({
+  if (run.n8nExecutionID && agent && typeof agent === 'object') {
+    await stopExecutionForAgent({
+      agent: agent as unknown as Record<string, unknown>,
       executionID: run.n8nExecutionID,
-      server: server as unknown as Record<string, unknown>,
+      req,
     }).catch((error) => {
       Sentry.captureException(error, {
         tags: { area: 'agent-harness', requestID: run.requestID },
@@ -911,6 +1099,76 @@ export const cancelAgentRun = async ({ req, runID }: { req: AgentRequest; runID:
   return updatedRun
 }
 
+export const resolveAgentApproval = async ({
+  approved,
+  req,
+  approvalID,
+  responsePayload,
+}: {
+  approved: boolean
+  req: AgentRequest
+  approvalID: string
+  responsePayload?: Record<string, unknown>
+}) => {
+  const readableApproval = await req.payload.findByID({
+    collection: 'agent-approvals',
+    depth: 0,
+    id: approvalID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  if (!readableApproval) throw new AgentHarnessError('not-found', 'Approval not found.', 404)
+  if (readableApproval.status !== 'pending') return readableApproval
+
+  if (readableApproval.expiresAt && new Date(readableApproval.expiresAt).getTime() < Date.now()) {
+    return req.payload.update({
+      collection: 'agent-approvals',
+      data: {
+        consumedAt: new Date().toISOString(),
+        status: 'expired',
+      },
+      id: approvalID,
+      overrideAccess: true,
+    })
+  }
+
+  const approval = await req.payload.findByID({
+    collection: 'agent-approvals',
+    depth: 0,
+    id: approvalID,
+    overrideAccess: true,
+  })
+
+  if (!approval?.resumeURL) {
+    throw new AgentHarnessError('input-validation', 'Approval resume URL is not configured.', 500)
+  }
+
+  await fetch(approval.resumeURL, {
+    body: JSON.stringify({
+      approved,
+      data: responsePayload ?? {},
+    }),
+    headers: {
+      'content-type': 'application/json',
+    },
+    method: 'POST',
+    redirect: 'error',
+  })
+
+  return req.payload.update({
+    collection: 'agent-approvals',
+    data: {
+      consumedAt: new Date().toISOString(),
+      responsePayload: asPayloadJSON(responsePayload),
+      status: approved ? 'approved' : 'rejected',
+    },
+    id: approvalID,
+    overrideAccess: true,
+  })
+}
+
 export const updateRunFromCallback = async (
   req: JSONReadableRequest & {
     headers: { get: (name: string) => string | null }
@@ -939,6 +1197,65 @@ export const updateRunFromCallback = async (
 
   const run = runResult.docs[0]
   if (!run) throw new AgentHarnessError('not-found', 'Run not found.', 404)
+
+  if (isTerminalRunStatus(run.status)) {
+    return run
+  }
+
+  if (body.status === 'waiting' && body.approval && typeof body.approval === 'object') {
+    const approval = body.approval as Record<string, unknown>
+    const expiresAt =
+      typeof approval.expiresAt === 'string'
+        ? approval.expiresAt
+        : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const sessionID = getRelationshipID(run.session)
+    const agentID = getRelationshipID(run.agent)
+    const userID = getRelationshipID(run.user)
+
+    await req.payload.update({
+      collection: 'agent-runs',
+      data: {
+        status: 'waiting',
+      },
+      id: run.id,
+      overrideAccess: true,
+    })
+
+    if (sessionID) {
+      await req.payload.update({
+        collection: 'agent-sessions',
+        data: {
+          lastRunAt: new Date().toISOString(),
+          status: 'waiting',
+        },
+        id: sessionID,
+        overrideAccess: true,
+      })
+    }
+
+    if (agentID && sessionID && userID && typeof approval.resumeURL === 'string') {
+      await req.payload.create({
+        collection: 'agent-approvals',
+        data: {
+          agent: agentID,
+          expiresAt,
+          prompt:
+            typeof approval.prompt === 'string'
+              ? approval.prompt
+              : 'This agent run is waiting for approval.',
+          resumeURL: approval.resumeURL,
+          run: run.id,
+          session: sessionID,
+          status: 'pending',
+          title: typeof approval.title === 'string' ? approval.title : 'Agent approval',
+          user: userID,
+        },
+        overrideAccess: true,
+      })
+    }
+
+    return run
+  }
 
   const status = body.status === 'failed' ? 'failed' : 'succeeded'
   const finishedAt = new Date()
@@ -997,6 +1314,16 @@ export const updateRunFromCallback = async (
         lastMessageAt: finishedAt.toISOString(),
         lastRunAt: finishedAt.toISOString(),
         status: 'active',
+      },
+      id: sessionID,
+      overrideAccess: true,
+    })
+  } else if (sessionID) {
+    await req.payload.update({
+      collection: 'agent-sessions',
+      data: {
+        lastRunAt: finishedAt.toISOString(),
+        status: 'failed',
       },
       id: sessionID,
       overrideAccess: true,

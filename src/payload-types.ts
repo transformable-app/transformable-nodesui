@@ -76,6 +76,9 @@ export interface Config {
     'data-tables': DataTable;
     'data-table-rows': DataTableRow;
     agents: Agent;
+    'agent-approvals': AgentApproval;
+    'agent-artifacts': AgentArtifact;
+    'agent-evaluation-runs': AgentEvaluationRun;
     'agent-sessions': AgentSession;
     'agent-messages': AgentMessage;
     'agent-runs': AgentRun;
@@ -105,6 +108,9 @@ export interface Config {
     'data-tables': DataTablesSelect<false> | DataTablesSelect<true>;
     'data-table-rows': DataTableRowsSelect<false> | DataTableRowsSelect<true>;
     agents: AgentsSelect<false> | AgentsSelect<true>;
+    'agent-approvals': AgentApprovalsSelect<false> | AgentApprovalsSelect<true>;
+    'agent-artifacts': AgentArtifactsSelect<false> | AgentArtifactsSelect<true>;
+    'agent-evaluation-runs': AgentEvaluationRunsSelect<false> | AgentEvaluationRunsSelect<true>;
     'agent-sessions': AgentSessionsSelect<false> | AgentSessionsSelect<true>;
     'agent-messages': AgentMessagesSelect<false> | AgentMessagesSelect<true>;
     'agent-runs': AgentRunsSelect<false> | AgentRunsSelect<true>;
@@ -144,6 +150,7 @@ export interface Config {
     tasks: {
       'n8n-sync': TaskN8NSync;
       'agent-run-reconciliation': TaskAgentRunReconciliation;
+      'agent-retention': TaskAgentRetention;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -548,6 +555,10 @@ export interface Agent {
    * Per-user concurrent run limit for this agent.
    */
   maxConcurrentRuns: number;
+  /**
+   * Per-user daily hard quota for this agent.
+   */
+  maxRunsPerDay: number;
   timeoutMS: number;
   maxInputBytes: number;
   welcomeMessage?: string | null;
@@ -1024,6 +1035,72 @@ export interface DataTableRow {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-approvals".
+ */
+export interface AgentApproval {
+  id: string;
+  title: string;
+  agent: string | Agent;
+  run: string | AgentRun;
+  session: string | AgentSession;
+  user: string | User;
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  prompt?: string | null;
+  resumeURL?: string | null;
+  responsePayload?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  expiresAt: string;
+  consumedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-runs".
+ */
+export interface AgentRun {
+  id: string;
+  requestID: string;
+  idempotencyKey?: string | null;
+  agent: string | Agent;
+  session: string | AgentSession;
+  user: string | User;
+  status: 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'timed-out' | 'cancelled';
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  durationMS?: number | null;
+  n8nExecutionID?: string | null;
+  execution?: (string | null) | Execution;
+  inputPreview?: string | null;
+  outputPreview?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  usage?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  feedback?: {
+    rating?: number | null;
+    comment?: string | null;
+    submittedAt?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agent-sessions".
  */
 export interface AgentSession {
@@ -1084,6 +1161,61 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-artifacts".
+ */
+export interface AgentArtifact {
+  id: string;
+  title: string;
+  agent: string | Agent;
+  run: string | AgentRun;
+  user: string | User;
+  kind: 'json' | 'media' | 'text' | 'url';
+  media?: (string | null) | Media;
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  text?: string | null;
+  url?: string | null;
+  expiresAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-evaluation-runs".
+ */
+export interface AgentEvaluationRun {
+  id: string;
+  name: string;
+  agent: string | Agent;
+  workflow?: (string | null) | Workflow;
+  dataTable?: (string | null) | DataTable;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  score?: number | null;
+  metrics?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  summary?: string | null;
+  n8nExecutionID?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agent-messages".
  */
 export interface AgentMessage {
@@ -1105,44 +1237,6 @@ export interface AgentMessage {
   status: 'pending' | 'streaming' | 'complete' | 'failed';
   providerMessageID?: string | null;
   createdBy?: (string | null) | User;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "agent-runs".
- */
-export interface AgentRun {
-  id: string;
-  requestID: string;
-  idempotencyKey?: string | null;
-  agent: string | Agent;
-  session: string | AgentSession;
-  user: string | User;
-  status: 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'timed-out' | 'cancelled';
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  durationMS?: number | null;
-  n8nExecutionID?: string | null;
-  execution?: (string | null) | Execution;
-  inputPreview?: string | null;
-  outputPreview?: string | null;
-  errorCode?: string | null;
-  errorMessage?: string | null;
-  usage?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  feedback?: {
-    rating?: number | null;
-    comment?: string | null;
-    submittedAt?: string | null;
-  };
   updatedAt: string;
   createdAt: string;
 }
@@ -1232,7 +1326,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'schedulePublish';
+        taskSlug: 'inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -1265,7 +1359,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'schedulePublish') | null;
+  taskSlug?: ('inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'schedulePublish') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -1323,6 +1417,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'agents';
         value: string | Agent;
+      } | null)
+    | ({
+        relationTo: 'agent-approvals';
+        value: string | AgentApproval;
+      } | null)
+    | ({
+        relationTo: 'agent-artifacts';
+        value: string | AgentArtifact;
+      } | null)
+    | ({
+        relationTo: 'agent-evaluation-runs';
+        value: string | AgentEvaluationRun;
       } | null)
     | ({
         relationTo: 'agent-sessions';
@@ -1811,6 +1917,7 @@ export interface AgentsSelect<T extends boolean = true> {
   streamingEnabled?: T;
   maxRunsPerMinute?: T;
   maxConcurrentRuns?: T;
+  maxRunsPerDay?: T;
   timeoutMS?: T;
   maxInputBytes?: T;
   welcomeMessage?: T;
@@ -1818,6 +1925,62 @@ export interface AgentsSelect<T extends boolean = true> {
   suggestedPrompts?: T;
   capabilities?: T;
   configurationWarning?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-approvals_select".
+ */
+export interface AgentApprovalsSelect<T extends boolean = true> {
+  title?: T;
+  agent?: T;
+  run?: T;
+  session?: T;
+  user?: T;
+  status?: T;
+  prompt?: T;
+  resumeURL?: T;
+  responsePayload?: T;
+  expiresAt?: T;
+  consumedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-artifacts_select".
+ */
+export interface AgentArtifactsSelect<T extends boolean = true> {
+  title?: T;
+  agent?: T;
+  run?: T;
+  user?: T;
+  kind?: T;
+  media?: T;
+  data?: T;
+  text?: T;
+  url?: T;
+  expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-evaluation-runs_select".
+ */
+export interface AgentEvaluationRunsSelect<T extends boolean = true> {
+  name?: T;
+  agent?: T;
+  workflow?: T;
+  dataTable?: T;
+  status?: T;
+  startedAt?: T;
+  finishedAt?: T;
+  score?: T;
+  metrics?: T;
+  summary?: T;
+  n8nExecutionID?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2445,6 +2608,25 @@ export interface TaskAgentRunReconciliation {
   output: {
     checked?: number | null;
     reconciled?: number | null;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskAgent-retention".
+ */
+export interface TaskAgentRetention {
+  input: {
+    /**
+     * Optional age threshold for deleting old sessions, messages, and runs. Expired approvals and artifacts are always removed.
+     */
+    retentionDays?: number | null;
+  };
+  output: {
+    deletedApprovals?: number | null;
+    deletedArtifacts?: number | null;
+    deletedMessages?: number | null;
+    deletedRuns?: number | null;
+    deletedSessions?: number | null;
   };
 }
 /**

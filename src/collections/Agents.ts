@@ -183,6 +183,17 @@ export const Agents: CollectionConfig = {
       },
     },
     {
+      name: 'maxRunsPerDay',
+      type: 'number',
+      defaultValue: 100,
+      min: 1,
+      max: 10000,
+      required: true,
+      admin: {
+        description: 'Per-user daily hard quota for this agent.',
+      },
+    },
+    {
       name: 'timeoutMS',
       type: 'number',
       defaultValue: 30000,

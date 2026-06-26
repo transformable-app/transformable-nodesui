@@ -9,6 +9,9 @@ import { DataTables } from './collections/DataTables'
 import { DataTableRows } from './collections/DataTableRows'
 import { Executions } from './collections/Executions'
 import { Agents } from './collections/Agents'
+import { AgentApprovals } from './collections/AgentApprovals'
+import { AgentArtifacts } from './collections/AgentArtifacts'
+import { AgentEvaluationRuns } from './collections/AgentEvaluationRuns'
 import { AgentMessages } from './collections/AgentMessages'
 import { AgentRuns } from './collections/AgentRuns'
 import { AgentSessions } from './collections/AgentSessions'
@@ -41,9 +44,7 @@ export default buildConfig({
   serverURL: getServerSideURL(),
   admin: {
     meta: {
-      icons: [
-        { rel: 'icon', url: '/admin-favicon' },
-      ],
+      icons: [{ rel: 'icon', url: '/admin-favicon' }],
     },
     components: {
       actions: ['@/components/Admin/GitHubAction'],
@@ -113,16 +114,18 @@ export default buildConfig({
     DataTables,
     DataTableRows,
     Agents,
+    AgentApprovals,
+    AgentArtifacts,
+    AgentEvaluationRuns,
     AgentSessions,
     AgentMessages,
     AgentRuns,
     Roles,
     Users,
   ],
-  cors: [
-    getServerSideURL(),
-    'https://payloadcms.3twenty9.com',
-  ].filter((url): url is string => Boolean(url) && typeof url === 'string'),
+  cors: [getServerSideURL(), 'https://payloadcms.3twenty9.com'].filter(
+    (url): url is string => Boolean(url) && typeof url === 'string',
+  ),
   folders: {
     browseByFolder: false,
   },

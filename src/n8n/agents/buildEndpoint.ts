@@ -17,6 +17,14 @@ const assertRelativeEndpointPath = (endpointPath: unknown): string => {
     throw new AgentHarnessError('input-validation', 'Agent endpoint path is not safe.', 500)
   }
 
+  if (path.includes('/webhook-test/') || path.endsWith('/webhook-test')) {
+    throw new AgentHarnessError(
+      'input-validation',
+      'Agent endpoint path must use a production trigger.',
+      500,
+    )
+  }
+
   return path
 }
 
@@ -34,21 +42,37 @@ export const buildAgentEndpoint = ({
   const base = new URL(baseURL)
 
   if (base.username || base.password) {
-    throw new AgentHarnessError('input-validation', 'Agent server URL cannot include credentials.', 500)
+    throw new AgentHarnessError(
+      'input-validation',
+      'Agent server URL cannot include credentials.',
+      500,
+    )
   }
 
   if (isProduction && base.protocol !== 'https:') {
-    throw new AgentHarnessError('input-validation', 'Agent server URL must use HTTPS in production.', 500)
+    throw new AgentHarnessError(
+      'input-validation',
+      'Agent server URL must use HTTPS in production.',
+      500,
+    )
   }
 
   if (!['http:', 'https:'].includes(base.protocol)) {
-    throw new AgentHarnessError('input-validation', 'Agent server URL protocol is not supported.', 500)
+    throw new AgentHarnessError(
+      'input-validation',
+      'Agent server URL protocol is not supported.',
+      500,
+    )
   }
 
   const endpoint = new URL(assertRelativeEndpointPath(endpointPath), base)
 
   if (endpoint.origin !== base.origin) {
-    throw new AgentHarnessError('input-validation', 'Agent endpoint must stay on the configured server.', 500)
+    throw new AgentHarnessError(
+      'input-validation',
+      'Agent endpoint must stay on the configured server.',
+      500,
+    )
   }
 
   return endpoint

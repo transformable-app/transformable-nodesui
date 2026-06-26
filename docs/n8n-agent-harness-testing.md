@@ -65,6 +65,7 @@ In Payload admin, create an `Agents` record:
 - `Streaming Enabled`: checked for structured SSE tests
 - `Max Runs Per Minute`: `12`
 - `Max Concurrent Runs`: `1`
+- `Max Runs Per Day`: `100`
 - `Timeout MS`: `30000`
 - `Max Input Bytes`: `20000`
 
@@ -134,7 +135,10 @@ const streamResponse = await fetch(`/api/agent-sessions/${session.id}/messages`,
     accept: 'text/event-stream',
     'content-type': 'application/json',
   },
-  body: JSON.stringify({ text: 'stream hello from Payload' }),
+  body: JSON.stringify({
+    idempotencyKey: crypto.randomUUID(),
+    text: 'stream hello from Payload',
+  }),
 })
 
 const reader = streamResponse.body.getReader()
@@ -211,6 +215,34 @@ Expected result:
 
 The route is keyed by the `requestID` in the body; the URL parameter exists for routing consistency.
 
+Calling the same callback twice should return the existing terminal run and should not append a duplicate assistant message.
+
+## Approval Test
+
+For waiting workflows that require human approval, have n8n call the callback endpoint with an approval payload:
+
+```bash
+curl -X POST http://localhost:3000/api/agent-runs/REQUEST_ID/events \
+  -H "authorization: Bearer replace-me-too" \
+  -H "content-type: application/json" \
+  -d '{
+    "requestID": "REQUEST_ID",
+    "status": "waiting",
+    "approval": {
+      "title": "Approve deployment",
+      "prompt": "Approve this action?",
+      "resumeURL": "https://n8n.example.com/webhook/resume/opaque-token",
+      "expiresAt": "2026-06-27T00:00:00.000Z"
+    }
+  }'
+```
+
+Expected result:
+
+- A pending `agent-approvals` record is created.
+- The n8n resume URL is not exposed to non-admin readers.
+- Resolving `POST /api/agent-approvals/APPROVAL_ID/resolve` with `{ "approved": true }` calls the resume URL server-side and marks the approval consumed.
+
 ## Negative Tests
 
 Verify these failures before exposing the harness beyond admin testing:
@@ -221,9 +253,11 @@ Verify these failures before exposing the harness beyond admin testing:
 - `endpointPath` containing `..` or a fragment fails invocation.
 - Missing or wrong `N8N_CALLBACK_SECRET` returns `401` on callback.
 - Message body larger than `Max Input Bytes` returns `413`.
+- Missing `idempotencyKey` on message send returns `400`.
 - Reusing the same `idempotencyKey` for the same session returns the existing run instead of creating a duplicate.
 - A second in-flight send for the same session returns `409`.
-- Exceeding `Max Runs Per Minute` or `Max Concurrent Runs` returns `429`.
+- Exceeding `Max Runs Per Minute`, `Max Concurrent Runs`, or `Max Runs Per Day` returns `429`.
+- `endpointPath` containing `/webhook-test/` fails invocation.
 
 ## Reconciliation Test
 
@@ -237,6 +271,15 @@ Expected result:
 - The session is moved out of `waiting`
 - The task output includes the number of reconciled runs
 
+## Retention Test
+
+The `agent-retention` task deletes expired approvals/artifacts and can optionally delete old sessions, messages, and runs.
+
+Expected result:
+
+- Expired `agent-approvals` and `agent-artifacts` are deleted.
+- Old sessions/messages/runs are only deleted when `retentionDays` is provided.
+
 ## Admin Records To Inspect
 
 After a successful test, inspect these collections in admin:
@@ -245,9 +288,12 @@ After a successful test, inspect these collections in admin:
 - `Agent Sessions`
 - `Agent Messages`
 - `Agent Runs`
+- `Agent Approvals`
+- `Agent Artifacts`
+- `Agent Evaluation Runs`
 
 The agent collections should appear after `Data Table Rows` in the admin nav.
 
 ## Current Scope Limits
 
-This implementation covers the authenticated conversational harness through structured SSE streaming, explicit cancellation, and stale-run reconciliation. It does not yet provide approval records/resume handling, retention/anonymization jobs, evaluation datasets, or long-running user notifications beyond persisted session/run/message state.
+This implementation covers the authenticated conversational harness through structured SSE streaming, explicit cancellation, approval records/resume handling, stale-run reconciliation, retention cleanup, artifacts, and evaluation run cataloging. It does not yet provide rich operational dashboards, out-of-band notifications, or an automated evaluator runner beyond storing normalized evaluation run results.

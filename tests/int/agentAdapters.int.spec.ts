@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildChatTriggerBody, parseChatTriggerResponse } from '@/n8n/agents/chatTriggerAdapter'
+import { buildAgentEndpoint } from '@/n8n/agents/buildEndpoint'
 import { buildWebhookBody, parseWebhookResponse } from '@/n8n/agents/webhookAdapter'
 import type { AgentInvocation } from '@/n8n/agents/types'
 
@@ -61,5 +62,14 @@ describe('agent transport adapters', () => {
       content: 'Waiting for callback',
       status: 'waiting',
     })
+  })
+
+  it('rejects n8n test webhook paths', () => {
+    expect(() =>
+      buildAgentEndpoint({
+        baseURL: 'https://n8n.example.com',
+        endpointPath: '/webhook-test/agent',
+      }),
+    ).toThrow('production trigger')
   })
 })
