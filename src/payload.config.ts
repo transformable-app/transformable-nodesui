@@ -8,6 +8,10 @@ import { Credentials } from './collections/Credentials'
 import { DataTables } from './collections/DataTables'
 import { DataTableRows } from './collections/DataTableRows'
 import { Executions } from './collections/Executions'
+import { Agents } from './collections/Agents'
+import { AgentMessages } from './collections/AgentMessages'
+import { AgentRuns } from './collections/AgentRuns'
+import { AgentSessions } from './collections/AgentSessions'
 import { Media } from './collections/Media'
 import { Pages } from './collections/Pages'
 import { Roles } from './collections/Roles'
@@ -21,6 +25,7 @@ import { plugins } from './plugins'
 import { defaultLexical } from '@/fields/defaultLexical'
 import { getServerSideURL } from './utilities/getURL'
 import { n8nSyncEndpoints } from './endpoints/n8nSync'
+import { agentEndpoints } from './endpoints/agents'
 import { ensureDashNavItem } from './endpoints/seed/ensure-dash-nav-item'
 import { issueForm } from './endpoints/seed/issue-form'
 import { yourAutomationsDash } from './endpoints/seed/your-automations-dash'
@@ -105,6 +110,10 @@ export default buildConfig({
     Workflows,
     Credentials,
     Executions,
+    Agents,
+    AgentSessions,
+    AgentMessages,
+    AgentRuns,
     DataTables,
     DataTableRows,
     Roles,
@@ -118,6 +127,7 @@ export default buildConfig({
     browseByFolder: false,
   },
   endpoints: [
+    ...agentEndpoints,
     ...n8nSyncEndpoints,
     {
       path: '/jobs/reset',

@@ -73,6 +73,10 @@ export interface Config {
     workflows: Workflow;
     credentials: Credential;
     executions: Execution;
+    agents: Agent;
+    'agent-sessions': AgentSession;
+    'agent-messages': AgentMessage;
+    'agent-runs': AgentRun;
     'data-tables': DataTable;
     'data-table-rows': DataTableRow;
     roles: Role;
@@ -98,6 +102,10 @@ export interface Config {
     workflows: WorkflowsSelect<false> | WorkflowsSelect<true>;
     credentials: CredentialsSelect<false> | CredentialsSelect<true>;
     executions: ExecutionsSelect<false> | ExecutionsSelect<true>;
+    agents: AgentsSelect<false> | AgentsSelect<true>;
+    'agent-sessions': AgentSessionsSelect<false> | AgentSessionsSelect<true>;
+    'agent-messages': AgentMessagesSelect<false> | AgentMessagesSelect<true>;
+    'agent-runs': AgentRunsSelect<false> | AgentRunsSelect<true>;
     'data-tables': DataTablesSelect<false> | DataTablesSelect<true>;
     'data-table-rows': DataTableRowsSelect<false> | DataTableRowsSelect<true>;
     roles: RolesSelect<false> | RolesSelect<true>;
@@ -890,24 +898,32 @@ export interface Execution {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "data-table-rows".
+ * via the `definition` "agents".
  */
-export interface DataTableRow {
+export interface Agent {
   id: string;
-  table: string | DataTable;
+  name: string;
+  slug: string;
+  description?: string | null;
+  enabled: boolean;
+  server: string | Server;
+  workflow: string | Workflow;
+  transport: 'chat-trigger' | 'webhook';
   /**
-   * Optional stable key for sync-managed rows, for example "<server-id>:<table-id>:<row-id>".
+   * Relative production webhook/chat path, for example /webhook/agent. Absolute URLs are rejected.
    */
-  sourceKey?: string | null;
+  endpointPath: string;
+  authStrategy: 'server-secret' | 'header' | 'jwt';
   /**
-   * Remote row identifier when available.
+   * Environment variable name resolved server-side for n8n invocation auth.
    */
-  rowID?: string | null;
-  rowIndex?: number | null;
+  secretReference?: string | null;
   /**
-   * Plain object keyed by the parent table column names.
+   * Non-admin users need one of these roles to invoke this agent.
    */
-  data:
+  allowedRoles?: (string | Role)[] | null;
+  inputMode: 'chat' | 'structured';
+  inputSchema?:
     | {
         [k: string]: unknown;
       }
@@ -916,9 +932,60 @@ export interface DataTableRow {
     | number
     | boolean
     | null;
-  lastSeenAt?: string | null;
-  remoteCreatedAt?: string | null;
-  remoteUpdatedAt?: string | null;
+  outputSchema?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  streamingEnabled?: boolean | null;
+  timeoutMS: number;
+  maxInputBytes: number;
+  welcomeMessage?: string | null;
+  placeholder?: string | null;
+  suggestedPrompts?: string[] | null;
+  /**
+   * Non-secret capability summary from the selected workflow.
+   */
+  capabilities?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  configurationWarning?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-sessions".
+ */
+export interface AgentSession {
+  id: string;
+  title?: string | null;
+  agent: string | Agent;
+  user: string | User;
+  externalSessionID: string;
+  status: 'active' | 'waiting' | 'completed' | 'failed' | 'cancelled';
+  lastMessageAt?: string | null;
+  lastRunAt?: string | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  expiresAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -955,6 +1022,104 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-messages".
+ */
+export interface AgentMessage {
+  id: string;
+  session: string | AgentSession;
+  run?: (string | null) | AgentRun;
+  sequence: number;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  structuredContent?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  status: 'pending' | 'streaming' | 'complete' | 'failed';
+  providerMessageID?: string | null;
+  createdBy?: (string | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-runs".
+ */
+export interface AgentRun {
+  id: string;
+  requestID: string;
+  idempotencyKey?: string | null;
+  agent: string | Agent;
+  session: string | AgentSession;
+  user: string | User;
+  status: 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'timed-out' | 'cancelled';
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  durationMS?: number | null;
+  n8nExecutionID?: string | null;
+  execution?: (string | null) | Execution;
+  inputPreview?: string | null;
+  outputPreview?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  usage?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  feedback?: {
+    rating?: number | null;
+    comment?: string | null;
+    submittedAt?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-table-rows".
+ */
+export interface DataTableRow {
+  id: string;
+  table: string | DataTable;
+  /**
+   * Optional stable key for sync-managed rows, for example "<server-id>:<table-id>:<row-id>".
+   */
+  sourceKey?: string | null;
+  /**
+   * Remote row identifier when available.
+   */
+  rowID?: string | null;
+  rowIndex?: number | null;
+  /**
+   * Plain object keyed by the parent table column names.
+   */
+  data:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  lastSeenAt?: string | null;
+  remoteCreatedAt?: string | null;
+  remoteUpdatedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1121,6 +1286,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'executions';
         value: string | Execution;
+      } | null)
+    | ({
+        relationTo: 'agents';
+        value: string | Agent;
+      } | null)
+    | ({
+        relationTo: 'agent-sessions';
+        value: string | AgentSession;
+      } | null)
+    | ({
+        relationTo: 'agent-messages';
+        value: string | AgentMessage;
+      } | null)
+    | ({
+        relationTo: 'agent-runs';
+        value: string | AgentRun;
       } | null)
     | ({
         relationTo: 'data-tables';
@@ -1518,6 +1699,101 @@ export interface ExecutionsSelect<T extends boolean = true> {
   errorStack?: T;
   payloadPreview?: T;
   apiData?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agents_select".
+ */
+export interface AgentsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  description?: T;
+  enabled?: T;
+  server?: T;
+  workflow?: T;
+  transport?: T;
+  endpointPath?: T;
+  authStrategy?: T;
+  secretReference?: T;
+  allowedRoles?: T;
+  inputMode?: T;
+  inputSchema?: T;
+  outputSchema?: T;
+  streamingEnabled?: T;
+  timeoutMS?: T;
+  maxInputBytes?: T;
+  welcomeMessage?: T;
+  placeholder?: T;
+  suggestedPrompts?: T;
+  capabilities?: T;
+  configurationWarning?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-sessions_select".
+ */
+export interface AgentSessionsSelect<T extends boolean = true> {
+  title?: T;
+  agent?: T;
+  user?: T;
+  externalSessionID?: T;
+  status?: T;
+  lastMessageAt?: T;
+  lastRunAt?: T;
+  metadata?: T;
+  expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-messages_select".
+ */
+export interface AgentMessagesSelect<T extends boolean = true> {
+  session?: T;
+  run?: T;
+  sequence?: T;
+  role?: T;
+  content?: T;
+  structuredContent?: T;
+  status?: T;
+  providerMessageID?: T;
+  createdBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-runs_select".
+ */
+export interface AgentRunsSelect<T extends boolean = true> {
+  requestID?: T;
+  idempotencyKey?: T;
+  agent?: T;
+  session?: T;
+  user?: T;
+  status?: T;
+  startedAt?: T;
+  finishedAt?: T;
+  durationMS?: T;
+  n8nExecutionID?: T;
+  execution?: T;
+  inputPreview?: T;
+  outputPreview?: T;
+  errorCode?: T;
+  errorMessage?: T;
+  usage?: T;
+  feedback?:
+    | T
+    | {
+        rating?: T;
+        comment?: T;
+        submittedAt?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
