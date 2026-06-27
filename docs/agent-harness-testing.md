@@ -16,6 +16,18 @@ export N8N_CALLBACK_SECRET="replace-me-too"
 
 The agent `secretReference` field stores the environment variable name, for example `TEST_AGENT_WEBHOOK_SECRET`, not the secret value.
 
+## Quick Start From The Admin Dashboard
+
+As an Admin, open the Payload admin dashboard (`/admin`). Next to **Sync n8n data now**, click **Set up test agent**.
+
+The setup modal walks through the shared checklist for the canonical `test-agent` preset.
+
+## Setup Guide On Any Agent
+
+When creating or editing any **Agents** record, use **Open setup guide** in the sidebar. This runs the same checklist against the current agent (or the unsaved form values on create) without requiring the dashboard test button.
+
+Use this path for custom agents, or after manually creating an agent record.
+
 ## Validate The Build
 
 Run these from the repo root:
@@ -31,7 +43,9 @@ Expected result: both commands exit successfully.
 
 Create or choose an n8n production Webhook or Chat Trigger workflow.
 
-For the simplest synchronous Webhook test, the workflow should:
+**Sample imports:** ready-made workflow JSON files live in [docs/n8n-workflows/](./n8n-workflows/README.md). Start with [test-agent-webhook.json](./n8n-workflows/test-agent-webhook.json) for the dashboard **Set up test agent** flow (`/webhook/test-agent`). After import, attach a Header Auth credential (`Authorization: Bearer <TEST_AGENT_WEBHOOK_SECRET>`), publish the workflow, sync into Payload, then run setup.
+
+For the simplest synchronous Webhook test built by hand, the workflow should:
 
 - Accept `POST`.
 - Require the same bearer token as `TEST_AGENT_WEBHOOK_SECRET`.
@@ -49,7 +63,9 @@ Use a production webhook path such as `/webhook/test-agent`. Do not use an absol
 
 ## Register The Agent
 
-In Payload admin, create an `Agents` record:
+Preferred path: use **Set up test agent** on the admin dashboard (see [Quick Start From The Admin Dashboard](#quick-start-from-the-admin-dashboard)). It upserts the canonical record with these defaults.
+
+Manual alternative: create an `Agents` record in the admin panel:
 
 - `Name`: `Test Agent`
 - `Slug`: `test-agent`

@@ -2,6 +2,7 @@ import type { CollectionConfig, Where } from 'payload'
 
 import { adminAuthenticatedAndNotContentManager } from '@/access/contentManagerRestrictions'
 import { checkRole } from '@/access/utilities'
+import { agentCollectionEndpoints } from '@/endpoints/agents'
 
 const getRoleID = (value: unknown): string | null => {
   if (typeof value === 'string') return value
@@ -15,6 +16,7 @@ const getRoleID = (value: unknown): string | null => {
 
 export const Agents: CollectionConfig = {
   slug: 'agents',
+  endpoints: agentCollectionEndpoints,
   labels: {
     plural: 'Agents',
     singular: 'Agent',
@@ -55,6 +57,16 @@ export const Agents: CollectionConfig = {
     welcomeMessage: true,
   },
   fields: [
+    {
+      name: 'setupGuide',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@/components/Admin/AgentSetupGuide#AgentSetupGuideField',
+        },
+        position: 'sidebar',
+      },
+    },
     {
       name: 'name',
       type: 'text',

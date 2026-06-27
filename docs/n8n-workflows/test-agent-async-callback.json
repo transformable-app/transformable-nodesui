@@ -1,0 +1,131 @@
+{
+  "name": "Payload Harness — Async Callback (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-agent-async-callback",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a2b3c4d5-e6f7-4890-a123-456789abcdef",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "payload-harness-test-agent-async-callback",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Payload Test Agent Bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "request-id",
+              "name": "requestID",
+              "type": "string",
+              "value": "={{ ($json.body ?? $json).requestID }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b3c4d5e6-f708-4901-b234-56789abcdef0",
+      "name": "Extract Request ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [260, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYLOAD_PUBLIC_URL.replace(/\\/$/, '') + '/api/agent-runs/' + $json.requestID + '/events' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"requestID\": $json.requestID, \"status\": \"succeeded\", \"content\": \"Async result is ready\", \"n8nExecutionID\": $execution.id } }}",
+        "options": {}
+      },
+      "id": "d5e6f708-1920-4123-d456-789abcdef012",
+      "name": "Callback Payload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 180],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CALLBACK_CREDENTIAL_ID",
+          "name": "Payload Callback Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"waiting\", \"content\": \"Processing asynchronously.\", \"n8nExecutionID\": $execution.id } }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e6f70819-2021-4234-e567-89abcdef0123",
+      "name": "Respond Waiting",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [260, 420]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Request ID",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Waiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Request ID": {
+      "main": [
+        [
+          {
+            "node": "Callback Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "payload-harness"
+    }
+  ]
+}

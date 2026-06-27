@@ -14,7 +14,7 @@ export const Admin: GlobalConfig = {
   label: 'Admin',
   admin: {
     description: 'Branding and content for the Payload admin panel (icon, login screen).',
-    group: 'Settings',
+    group: 'System',
     hidden: ({ user }) => Boolean(user && userHasRestrictedManagerRole(user)),
   },
   access: {

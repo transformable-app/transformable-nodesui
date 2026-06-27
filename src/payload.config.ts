@@ -23,12 +23,12 @@ import { Users } from './collections/Users'
 import { Workflows } from './collections/Workflows'
 import { Admin } from './Admin/config'
 import { Header } from './Header/config'
-import { Jobs } from './JobsGlobal/config'
 import { plugins } from './plugins'
 import { defaultLexical } from '@/fields/defaultLexical'
 import { getServerSideURL } from './utilities/getURL'
 import { n8nSyncEndpoints } from './endpoints/n8nSync'
 import { agentEndpoints } from './endpoints/agents'
+import { sampleWorkflowEndpoints } from './endpoints/sampleWorkflows'
 import { ensureDashNavItem } from './endpoints/seed/ensure-dash-nav-item'
 import { issueForm } from './endpoints/seed/issue-form'
 import { yourAutomationsDash } from './endpoints/seed/your-automations-dash'
@@ -132,6 +132,7 @@ export default buildConfig({
   endpoints: [
     ...agentEndpoints,
     ...n8nSyncEndpoints,
+    ...sampleWorkflowEndpoints,
     {
       path: '/jobs/reset',
       method: 'post',
@@ -160,7 +161,7 @@ export default buildConfig({
       },
     },
   ],
-  globals: [Admin, Jobs, Header],
+  globals: [Admin, Header],
   plugins,
   secret: process.env.PAYLOAD_SECRET,
   sharp,
@@ -251,6 +252,13 @@ export default buildConfig({
           },
         ]
       : undefined,
+    jobsCollectionOverrides: ({ defaultJobsCollection }) => ({
+      ...defaultJobsCollection,
+      admin: {
+        ...defaultJobsCollection.admin,
+        hidden: false,
+      },
+    }),
     tasks,
   },
 })

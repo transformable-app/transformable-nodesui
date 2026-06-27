@@ -29,6 +29,7 @@ export const Users: CollectionConfig = {
     update: usersReadExcludingContentManager,
   },
   admin: {
+    group: 'Globals',
     defaultColumns: ['name', 'email'],
     useAsTitle: 'name',
     hidden: ({ user }) => Boolean(user && userHasRestrictedManagerRole(user)),

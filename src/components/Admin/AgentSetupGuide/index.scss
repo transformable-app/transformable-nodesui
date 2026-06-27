@@ -1,0 +1,299 @@
+@import '~@payloadcms/ui/scss';
+
+.agentSetupGuide {
+  &__field {
+    display: grid;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  &__field-copy {
+    margin: 0;
+    opacity: 0.85;
+    font-size: 0.875rem;
+  }
+
+  &__trigger,
+  &__dashboard-trigger {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.65rem 1rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    font-weight: 700;
+    line-height: 1;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease,
+      opacity 0.2s ease;
+
+    &:hover:not(:disabled) {
+      cursor: pointer;
+      background: color-mix(in srgb, currentColor 10%, transparent);
+    }
+
+    &:disabled {
+      cursor: wait;
+      opacity: 0.7;
+    }
+  }
+
+  &__trigger {
+    width: 100%;
+    border-radius: var(--border-radius-m, 0.5rem);
+  }
+
+  &__modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  &__modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 45%);
+  }
+
+  &__modal-panel {
+    position: relative;
+    z-index: 1;
+    width: min(42rem, 100%);
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    padding: 1.25rem;
+    border-radius: 0.75rem;
+    background: var(--theme-elevation-0, #fff);
+    color: var(--theme-text, #111);
+    box-shadow: 0 1rem 2rem rgb(0 0 0 / 18%);
+  }
+
+  &__modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+
+    h3 {
+      margin: 0;
+      font-size: 1.125rem;
+    }
+  }
+
+  &__close {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+  }
+
+  &__message,
+  &__meta,
+  &__warning,
+  &__help {
+    margin: 0 0 0.75rem;
+  }
+
+  &__warning {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, orange 12%, transparent);
+  }
+
+  &__checklist {
+    margin: 0 0 1rem;
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  &__checklist-item {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+
+    p {
+      margin: 0.25rem 0 0;
+      opacity: 0.85;
+    }
+
+    &.is-ok .agentSetupGuide__checklist-icon {
+      color: var(--theme-success-500, #059669);
+    }
+
+    &.is-pending .agentSetupGuide__checklist-icon {
+      opacity: 0.55;
+    }
+  }
+
+  &__checklist-icon {
+    flex: 0 0 auto;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  &__example,
+  &__smoke-test {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--theme-elevation-150, #ddd);
+    border-radius: 0.5rem;
+    background: var(--theme-elevation-50, #fafafa);
+  }
+
+  &__example-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  pre {
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.8125rem;
+  }
+
+  &__smoke-test summary {
+    cursor: pointer;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+
+  &__modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  &__help code {
+    font-size: 0.85em;
+  }
+
+  &__samples {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--theme-elevation-150, #ddd);
+    border-radius: 0.5rem;
+    background: var(--theme-elevation-50, #fafafa);
+  }
+
+  &__samples-intro {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    opacity: 0.9;
+  }
+
+  &__samples-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  &__samples-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--theme-elevation-150, #ddd);
+    border-radius: 0.5rem;
+    background: var(--theme-elevation-0, #fff);
+
+    &.is-recommended {
+      border-color: color-mix(in srgb, var(--theme-success-500, #059669) 45%, #ddd);
+    }
+
+    p {
+      margin: 0.35rem 0 0;
+      font-size: 0.8125rem;
+      opacity: 0.85;
+    }
+  }
+
+  &__samples-copy {
+    min-width: 0;
+  }
+
+  &__samples-path {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
+    opacity: 0.75;
+  }
+
+  &__samples-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+
+  &__samples-link {
+    font-size: 0.75rem;
+    word-break: break-all;
+    text-align: right;
+  }
+
+  &__samples-download {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.75rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid currentColor;
+    border-radius: var(--border-radius-m, 0.375rem);
+    background: transparent;
+    color: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, currentColor 10%, transparent);
+    }
+
+    &.is-primary {
+      background: var(--theme-elevation-800, #111);
+      border-color: var(--theme-elevation-800, #111);
+      color: var(--theme-elevation-0, #fff);
+
+      &:hover {
+        opacity: 0.9;
+      }
+    }
+  }
+
+  &__help a {
+    color: inherit;
+    text-decoration: underline;
+  }
+}
+
+html[data-theme='dark'] .agentSetupGuide__modal-panel {
+  background: var(--theme-elevation-50, #171717);
+}

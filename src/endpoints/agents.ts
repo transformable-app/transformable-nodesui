@@ -12,6 +12,11 @@ import {
   updateRunFromCallback,
 } from '@/n8n/agents/invokeAgent'
 import { AgentHarnessError, type AgentRequest } from '@/n8n/agents/types'
+import {
+  agentSetupGuideByIDEndpoint,
+  agentSetupGuideEndpoint,
+  testAgentSetupEndpoint,
+} from '@/endpoints/testAgentSetup'
 
 const requireUser = (req: Parameters<Endpoint['handler']>[0]): AgentRequest => {
   if (!req.user) throw new APIError('Unauthorized', 401)
@@ -151,38 +156,6 @@ const upsertAgentEvaluationRun = async (req: Parameters<Endpoint['handler']>[0])
 }
 
 export const agentEndpoints: Endpoint[] = [
-  {
-    path: '/agents/:slug/sessions',
-    method: 'post',
-    handler: async (req) => {
-      try {
-        const session = await createAgentSession({
-          req: requireUser(req),
-          slug: String(req.routeParams?.slug ?? ''),
-        })
-
-        return Response.json({ session })
-      } catch (error) {
-        return handleAgentError(error)
-      }
-    },
-  },
-  {
-    path: '/agents/:slug/sessions',
-    method: 'get',
-    handler: async (req) => {
-      try {
-        const sessions = await listAgentSessions({
-          req: requireUser(req),
-          slug: String(req.routeParams?.slug ?? ''),
-        })
-
-        return Response.json(sessions)
-      } catch (error) {
-        return handleAgentError(error)
-      }
-    },
-  },
   {
     path: '/agent-sessions/:id/messages',
     method: 'post',
@@ -327,6 +300,44 @@ export const agentEndpoints: Endpoint[] = [
       try {
         const evaluationRun = await upsertAgentEvaluationRun(req)
         return Response.json({ evaluationRun })
+      } catch (error) {
+        return handleAgentError(error)
+      }
+    },
+  },
+]
+
+export const agentCollectionEndpoints: Endpoint[] = [
+  { ...agentSetupGuideEndpoint, path: '/setup-guide' },
+  { ...agentSetupGuideByIDEndpoint, path: '/:id/setup-guide' },
+  { ...testAgentSetupEndpoint, path: '/test-setup' },
+  {
+    path: '/:slug/sessions',
+    method: 'post',
+    handler: async (req) => {
+      try {
+        const session = await createAgentSession({
+          req: requireUser(req),
+          slug: String(req.routeParams?.slug ?? ''),
+        })
+
+        return Response.json({ session })
+      } catch (error) {
+        return handleAgentError(error)
+      }
+    },
+  },
+  {
+    path: '/:slug/sessions',
+    method: 'get',
+    handler: async (req) => {
+      try {
+        const sessions = await listAgentSessions({
+          req: requireUser(req),
+          slug: String(req.routeParams?.slug ?? ''),
+        })
+
+        return Response.json(sessions)
       } catch (error) {
         return handleAgentError(error)
       }

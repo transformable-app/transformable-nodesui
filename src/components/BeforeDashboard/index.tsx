@@ -6,6 +6,7 @@ import { getPayload } from 'payload'
 import { getServerSideURL } from '@/utilities/getURL'
 import RichText from '@/components/RichText'
 import { SyncButton } from './SyncButton'
+import { TestAgentButton } from './TestAgentButton'
 import './index.scss'
 
 const baseClass = 'before-dashboard'
@@ -55,6 +56,7 @@ const BeforeDashboard: React.FC = async () => {
         </h4>
         <div className={`${baseClass}__actions`}>
           <SyncButton />
+          <TestAgentButton />
         </div>
         {hasBannerExtra ? (
           <div className={`${baseClass}__banner-extra`}>

@@ -131,13 +131,11 @@ export interface Config {
   fallbackLocale: null;
   globals: {
     'admin-settings': AdminSetting;
-    jobs: Job;
     header: Header;
     'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
     'admin-settings': AdminSettingsSelect<false> | AdminSettingsSelect<true>;
-    jobs: JobsSelect<false> | JobsSelect<true>;
     header: HeaderSelect<false> | HeaderSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
@@ -2410,15 +2408,6 @@ export interface AdminSetting {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "jobs".
- */
-export interface Job {
-  id: string;
-  updatedAt?: string | null;
-  createdAt?: string | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header".
  */
 export interface Header {
@@ -2507,15 +2496,6 @@ export interface AdminSettingsSelect<T extends boolean = true> {
   bannerBgDark?: T;
   bannerTextDark?: T;
   bannerLinkDark?: T;
-  updatedAt?: T;
-  createdAt?: T;
-  globalType?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "jobs_select".
- */
-export interface JobsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

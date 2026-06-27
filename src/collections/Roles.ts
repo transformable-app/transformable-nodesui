@@ -16,6 +16,7 @@ export const Roles: CollectionConfig = {
     update: authenticatedAndNotContentManager,
   },
   admin: {
+    group: 'Globals',
     useAsTitle: 'name',
     hidden: ({ user }) => Boolean(user && userHasRestrictedManagerRole(user)),
   },
