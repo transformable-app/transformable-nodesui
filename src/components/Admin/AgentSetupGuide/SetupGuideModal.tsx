@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { Button, CopyToClipboard } from '@payloadcms/ui'
 
 import {
@@ -61,7 +62,7 @@ export const AgentSetupGuideModal = ({
       ? 'Fill in and save the agent record, or continue configuring n8n first.'
       : 'Save the agent with a slug, server, workflow, and endpoint path.'
 
-  return (
+  const modal = (
     <div
       className="agentSetupGuide__modal"
       role="dialog"
@@ -216,4 +217,10 @@ export const AgentSetupGuideModal = ({
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') {
+    return modal
+  }
+
+  return createPortal(modal, document.body)
 }
