@@ -99,6 +99,7 @@ describe('test agent setup helpers', () => {
 
   it('exposes sample workflow download metadata', () => {
     expect(SAMPLE_N8N_WORKFLOW_FILENAMES.has('test-agent-webhook.json')).toBe(true)
+    expect(SAMPLE_N8N_WORKFLOW_FILENAMES.has('structured-plan-echo.json')).toBe(true)
     expect(getSampleWorkflowDownloadURL('test-agent-webhook.json')).toBe(
       '/api/n8n/sample-workflows/test-agent-webhook.json',
     )

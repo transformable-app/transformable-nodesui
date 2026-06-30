@@ -13,6 +13,8 @@ import { AgentApprovals } from './collections/AgentApprovals'
 import { AgentArtifacts } from './collections/AgentArtifacts'
 import { AgentEvaluationRuns } from './collections/AgentEvaluationRuns'
 import { AgentMessages } from './collections/AgentMessages'
+import { AgentPlans } from './collections/AgentPlans'
+import { AgentPlanTasks } from './collections/AgentPlanTasks'
 import { AgentRuns } from './collections/AgentRuns'
 import { AgentSessions } from './collections/AgentSessions'
 import { Media } from './collections/Media'
@@ -117,6 +119,8 @@ export default buildConfig({
     AgentApprovals,
     AgentArtifacts,
     AgentEvaluationRuns,
+    AgentPlans,
+    AgentPlanTasks,
     AgentSessions,
     AgentMessages,
     AgentRuns,

@@ -79,6 +79,8 @@ export interface Config {
     'agent-approvals': AgentApproval;
     'agent-artifacts': AgentArtifact;
     'agent-evaluation-runs': AgentEvaluationRun;
+    'agent-plans': AgentPlan;
+    'agent-plan-tasks': AgentPlanTask;
     'agent-sessions': AgentSession;
     'agent-messages': AgentMessage;
     'agent-runs': AgentRun;
@@ -111,6 +113,8 @@ export interface Config {
     'agent-approvals': AgentApprovalsSelect<false> | AgentApprovalsSelect<true>;
     'agent-artifacts': AgentArtifactsSelect<false> | AgentArtifactsSelect<true>;
     'agent-evaluation-runs': AgentEvaluationRunsSelect<false> | AgentEvaluationRunsSelect<true>;
+    'agent-plans': AgentPlansSelect<false> | AgentPlansSelect<true>;
+    'agent-plan-tasks': AgentPlanTasksSelect<false> | AgentPlanTasksSelect<true>;
     'agent-sessions': AgentSessionsSelect<false> | AgentSessionsSelect<true>;
     'agent-messages': AgentMessagesSelect<false> | AgentMessagesSelect<true>;
     'agent-runs': AgentRunsSelect<false> | AgentRunsSelect<true>;
@@ -1079,6 +1083,9 @@ export interface AgentRun {
   durationMS?: number | null;
   n8nExecutionID?: string | null;
   execution?: (string | null) | Execution;
+  plan?: (string | null) | AgentPlan;
+  planTask?: (string | null) | AgentPlanTask;
+  iteration?: number | null;
   inputPreview?: string | null;
   outputPreview?: string | null;
   errorCode?: string | null;
@@ -1159,6 +1166,136 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-plans".
+ */
+export interface AgentPlan {
+  id: string;
+  title: string;
+  objective: string;
+  slug: string;
+  agent: string | Agent;
+  session?: (string | null) | AgentSession;
+  createdBy: string | User;
+  status:
+    | 'draft'
+    | 'validating'
+    | 'queued'
+    | 'running'
+    | 'waiting'
+    | 'paused'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled'
+    | 'blocked'
+    | 'timed-out';
+  mode: 'sequential' | 'dependency' | 'manual';
+  submittedInput?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  sharedContext?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  limits: {
+    maxIterations: number;
+    maxConcurrentTasks: number;
+    maxTaskAttempts: number;
+    timeoutMS: number;
+  };
+  approvalPolicy?: {
+    requireBeforeStart?: boolean | null;
+    requireBeforeWrite?: boolean | null;
+    requireOnRisk?: boolean | null;
+  };
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  lastRunAt?: string | null;
+  summary?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-plan-tasks".
+ */
+export interface AgentPlanTask {
+  id: string;
+  plan: string | AgentPlan;
+  createdBy: string | User;
+  taskID: string;
+  title: string;
+  instructions: string;
+  dependsOn?:
+    | {
+        taskID: string;
+        id?: string | null;
+      }[]
+    | null;
+  status:
+    | 'pending'
+    | 'ready'
+    | 'running'
+    | 'waiting'
+    | 'needs-approval'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled'
+    | 'skipped'
+    | 'blocked';
+  attempts: number;
+  maxAttempts: number;
+  latestRun?: (string | null) | AgentRun;
+  runs?: (string | AgentRun)[] | null;
+  inputPreview?: string | null;
+  outputPreview?: string | null;
+  outputSummary?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  expectedOutput?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  successCriteria?:
+    | {
+        criterion: string;
+        id?: string | null;
+      }[]
+    | null;
+  riskLevel: 'low' | 'medium' | 'high';
+  requiresApproval?: boolean | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1430,6 +1567,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'agent-evaluation-runs';
         value: string | AgentEvaluationRun;
+      } | null)
+    | ({
+        relationTo: 'agent-plans';
+        value: string | AgentPlan;
+      } | null)
+    | ({
+        relationTo: 'agent-plan-tasks';
+        value: string | AgentPlanTask;
       } | null)
     | ({
         relationTo: 'agent-sessions';
@@ -1988,6 +2133,85 @@ export interface AgentEvaluationRunsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-plans_select".
+ */
+export interface AgentPlansSelect<T extends boolean = true> {
+  title?: T;
+  objective?: T;
+  slug?: T;
+  agent?: T;
+  session?: T;
+  createdBy?: T;
+  status?: T;
+  mode?: T;
+  submittedInput?: T;
+  sharedContext?: T;
+  limits?:
+    | T
+    | {
+        maxIterations?: T;
+        maxConcurrentTasks?: T;
+        maxTaskAttempts?: T;
+        timeoutMS?: T;
+      };
+  approvalPolicy?:
+    | T
+    | {
+        requireBeforeStart?: T;
+        requireBeforeWrite?: T;
+        requireOnRisk?: T;
+      };
+  startedAt?: T;
+  finishedAt?: T;
+  lastRunAt?: T;
+  summary?: T;
+  errorCode?: T;
+  errorMessage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "agent-plan-tasks_select".
+ */
+export interface AgentPlanTasksSelect<T extends boolean = true> {
+  plan?: T;
+  createdBy?: T;
+  taskID?: T;
+  title?: T;
+  instructions?: T;
+  dependsOn?:
+    | T
+    | {
+        taskID?: T;
+        id?: T;
+      };
+  status?: T;
+  attempts?: T;
+  maxAttempts?: T;
+  latestRun?: T;
+  runs?: T;
+  inputPreview?: T;
+  outputPreview?: T;
+  outputSummary?: T;
+  errorCode?: T;
+  errorMessage?: T;
+  expectedOutput?: T;
+  successCriteria?:
+    | T
+    | {
+        criterion?: T;
+        id?: T;
+      };
+  riskLevel?: T;
+  requiresApproval?: T;
+  startedAt?: T;
+  finishedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agent-sessions_select".
  */
 export interface AgentSessionsSelect<T extends boolean = true> {
@@ -2038,6 +2262,9 @@ export interface AgentRunsSelect<T extends boolean = true> {
   durationMS?: T;
   n8nExecutionID?: T;
   execution?: T;
+  plan?: T;
+  planTask?: T;
+  iteration?: T;
   inputPreview?: T;
   outputPreview?: T;
   errorCode?: T;

@@ -1,4 +1,5 @@
 export type SampleN8nWorkflow = {
+  category?: 'agent-chat' | 'agent-plan'
   description: string
   endpointPath: string
   filename: string
@@ -7,6 +8,7 @@ export type SampleN8nWorkflow = {
 
 /** Default sample for the dashboard test-agent preset and Agent Chat block smoke tests. */
 export const DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW: SampleN8nWorkflow = {
+  category: 'agent-chat',
   description:
     'Webhook + AI Agent workflow for the Agent Chat block. Includes OpenAI Chat Model, memory, a placeholder Calculator tool, and harness response shaping.',
   endpointPath: '/webhook/test-agent',
@@ -21,6 +23,7 @@ export const AGENT_CHAT_SAMPLE_WORKFLOW = DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW
 export const AGENT_CHAT_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
   DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW,
   {
+    category: 'agent-chat',
     description: 'Echoes harness input.text in the assistant response.',
     endpointPath: '/webhook/test-agent-echo',
     filename: 'test-agent-echo-webhook.json',
@@ -30,6 +33,7 @@ export const AGENT_CHAT_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
 
 const ASYNC_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
   {
+    category: 'agent-chat',
     description:
       'Returns waiting; complete the run with a manual Payload callback curl. Requires N8N_CALLBACK_SECRET.',
     endpointPath: '/webhook/test-agent-async',
@@ -37,6 +41,7 @@ const ASYNC_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
     label: 'Async Waiting (Webhook)',
   },
   {
+    category: 'agent-chat',
     description:
       'Returns waiting, then POSTs a completion callback to Payload. Requires N8N_CALLBACK_SECRET and PAYLOAD_PUBLIC_URL on the n8n host.',
     endpointPath: '/webhook/test-agent-async-callback',
@@ -45,9 +50,21 @@ const ASYNC_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
   },
 ]
 
+export const AGENT_PLAN_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
+  {
+    category: 'agent-plan',
+    description:
+      'Accepts one structured plan task invocation and echoes the task output summary for AgentPlanBlock smoke tests.',
+    endpointPath: '/webhook/structured-plan-echo',
+    filename: 'structured-plan-echo.json',
+    label: 'Structured Plan Echo (Webhook)',
+  },
+]
+
 export const SAMPLE_N8N_WORKFLOWS: SampleN8nWorkflow[] = [
   ...AGENT_CHAT_SAMPLE_WORKFLOWS,
   ...ASYNC_SAMPLE_WORKFLOWS,
+  ...AGENT_PLAN_SAMPLE_WORKFLOWS,
 ]
 
 /** All importable samples shown in the admin setup guide modal. */

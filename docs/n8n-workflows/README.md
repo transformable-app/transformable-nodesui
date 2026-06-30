@@ -10,6 +10,7 @@ Importable n8n workflow JSON files for testing the Payload agent harness. They m
 | [test-agent-echo-webhook.json](./test-agent-echo-webhook.json) | `/webhook/test-agent-echo` | Returns `Echo: <user text>` from the harness `input.text` field. |
 | [test-agent-async-waiting.json](./test-agent-async-waiting.json) | `/webhook/test-agent-async` | Returns `status: "waiting"` only. Use with a manual Payload callback curl. |
 | [test-agent-async-callback.json](./test-agent-async-callback.json) | `/webhook/test-agent-async-callback` | Returns `waiting`, then POSTs a completion callback to Payload in the same execution. |
+| [structured-plan-echo.json](./structured-plan-echo.json) | `/webhook/structured-plan-echo` | Structured AgentPlanBlock smoke test. Echoes one task invocation and returns `output` plus `summary`. |
 
 Start with **test-agent-webhook.json** when using **Set up test agent** on the dashboard (endpoint path `/webhook/test-agent`).
 
@@ -100,6 +101,21 @@ Payload-side vars (not in these JSON files):
 }
 ```
 
+### Structured plan task (structured-plan-echo)
+
+```json
+{
+  "requestID": "<from harness invocation>",
+  "status": "succeeded",
+  "output": {
+    "taskID": "<input.data.taskID>",
+    "receivedInput": {}
+  },
+  "summary": "Completed <taskID> for plan <planID>",
+  "n8nExecutionID": "<execution id>"
+}
+```
+
 ### Callback body (Payload `POST /api/agent-runs/:requestID/events`)
 
 ```json
@@ -119,6 +135,7 @@ Payload-side vars (not in these JSON files):
 | test-agent-echo-webhook.json | `test-agent-echo` | `/webhook/test-agent-echo` | `webhook` |
 | test-agent-async-waiting.json | `test-agent-async` | `/webhook/test-agent-async` | `webhook` |
 | test-agent-async-callback.json | `test-agent-async-callback` | `/webhook/test-agent-async-callback` | `webhook` |
+| structured-plan-echo.json | `structured-plan-echo` | `/webhook/structured-plan-echo` | `webhook` |
 
 Use **Set up test agent** for the first row only. For the others, create an **Agents** record manually and open **Setup guide** in the sidebar.
 

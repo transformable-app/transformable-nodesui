@@ -1,0 +1,68 @@
+{
+  "name": "Structured Plan Echo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "structured-plan-echo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "structured-plan-webhook",
+      "name": "Structured Plan Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "structured-plan-echo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst data = body.input?.data ?? {};\nreturn [{\n  json: {\n    requestID: body.requestID,\n    status: 'succeeded',\n    output: {\n      taskID: data.taskID,\n      title: data.title,\n      receivedInput: data.input ?? {},\n      instructionsLength: String(data.instructions ?? '').length\n    },\n    summary: `Completed ${data.taskID ?? 'task'} for plan ${data.planID ?? 'unknown'}`,\n    n8nExecutionID: $execution.id\n  }\n}];"
+      },
+      "id": "shape-plan-response",
+      "name": "Shape Plan Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "Structured Plan Webhook": {
+      "main": [
+        [
+          {
+            "node": "Shape Plan Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Plan Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
