@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { AgentHarnessError } from '@/n8n/agents/types'
 import { toPreview } from '@/n8n/agents/redact'
 
+import { runPlanLoop } from './runPlanLoop'
 import { validateAgentPlanInput } from './validatePlan'
 
 type CreateAgentPlanArgs = {
@@ -112,6 +113,10 @@ export const createAgentPlan = async ({ input, req, start = false }: CreateAgent
         req,
       }),
     )
+  }
+
+  if (start) {
+    await runPlanLoop({ planID: String(plan.id), req })
   }
 
   return { plan, tasks, validation: { plan: validation.redactedPlan } }

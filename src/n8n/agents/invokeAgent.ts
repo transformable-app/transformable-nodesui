@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { assertSameServerURL } from './buildEndpoint'
 import { getRelationshipID, resolveAgentBySlug } from './resolveAgent'
 import { invokeN8nAgent, invokeN8nAgentStream, stopN8nExecution } from './adapters'
+import { finalizePlanTaskFromRun } from './plans/finalizeTask'
 import { redactValue, toPreview } from './redact'
 import { AgentHarnessError, type AgentRequest, type AgentStreamEvent } from './types'
 
@@ -1622,6 +1623,30 @@ export const updateRunFromCallback = async (
     },
     id: run.id,
     overrideAccess: true,
+  })
+
+  await finalizePlanTaskFromRun({
+    req,
+    response: {
+      content,
+      data:
+        body.data && typeof body.data === 'object'
+          ? (body.data as Record<string, unknown>)
+          : body.output && typeof body.output === 'object'
+            ? (body.output as Record<string, unknown>)
+            : undefined,
+      n8nExecutionID: typeof body.n8nExecutionID === 'string' ? body.n8nExecutionID : undefined,
+      status,
+      usage:
+        body.usage && typeof body.usage === 'object'
+          ? (body.usage as Record<string, unknown>)
+          : undefined,
+    },
+    run: {
+      id: String(run.id),
+      plan: run.plan,
+      planTask: run.planTask,
+    },
   })
 
   if (sessionID && status === 'succeeded') {

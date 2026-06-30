@@ -22,7 +22,7 @@ export type AgentInvokeResult = {
   content: string
   data?: Record<string, unknown>
   n8nExecutionID?: string
-  status: 'succeeded' | 'waiting'
+  status: 'failed' | 'needs-approval' | 'succeeded' | 'waiting'
   usage?: Record<string, unknown>
 }
 

@@ -13,15 +13,22 @@ export const parseWebhookResponse = (value: unknown): AgentInvokeResult => {
 
   const data = value as Record<string, unknown>
   const contentValue = data.content ?? data.text ?? data.output ?? data.message ?? data.response
+  const structuredData = data.data ?? data.output
+  const status =
+    data.status === 'waiting' ||
+    data.status === 'failed' ||
+    data.status === 'needs-approval'
+      ? data.status
+      : 'succeeded'
 
   return {
     content: typeof contentValue === 'string' ? contentValue : toPreview(contentValue ?? data),
     data:
-      typeof data.data === 'object' && data.data
-        ? (data.data as Record<string, unknown>)
+      typeof structuredData === 'object' && structuredData
+        ? (structuredData as Record<string, unknown>)
         : undefined,
     n8nExecutionID: typeof data.n8nExecutionID === 'string' ? data.n8nExecutionID : undefined,
-    status: data.status === 'waiting' ? 'waiting' : 'succeeded',
+    status,
     usage:
       typeof data.usage === 'object' && data.usage
         ? (data.usage as Record<string, unknown>)

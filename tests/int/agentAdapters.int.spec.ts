@@ -69,6 +69,19 @@ describe('agent transport adapters', () => {
     })
   })
 
+  it('preserves webhook output objects as structured data', () => {
+    expect(
+      parseWebhookResponse({
+        output: { summary: 'Done', taskID: 'task-1' },
+        status: 'succeeded',
+      }),
+    ).toMatchObject({
+      content: '{"summary":"Done","taskID":"task-1"}',
+      data: { summary: 'Done', taskID: 'task-1' },
+      status: 'succeeded',
+    })
+  })
+
   it('rejects n8n test webhook paths', () => {
     expect(() =>
       buildAgentEndpoint({

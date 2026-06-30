@@ -43,7 +43,7 @@ Expected result: both commands exit successfully.
 
 Create or choose an n8n production Webhook or Chat Trigger workflow.
 
-**Sample imports:** ready-made workflow JSON files live in [docs/n8n-workflows/](./n8n-workflows/README.md). Start with [test-agent-webhook.json](./n8n-workflows/test-agent-webhook.json) for the dashboard **Set up test agent** flow (`/webhook/test-agent`). After import, attach a Header Auth credential (`Authorization: Bearer <TEST_AGENT_WEBHOOK_SECRET>`), publish the workflow, sync into Payload, then run setup.
+**Sample imports:** ready-made workflow JSON files live in [docs/n8n-workflows/](./n8n-workflows/README.md). Start with [test-agent-webhook.json](./n8n-workflows/test-agent-webhook.json) for the dashboard **Set up test agent** flow (`/webhook/test-agent`). Use [structured-plan-echo.json](./n8n-workflows/structured-plan-echo.json) for structured plan task smoke tests (`/webhook/structured-plan-echo`). After import, attach a Header Auth credential (`Authorization: Bearer <TEST_AGENT_WEBHOOK_SECRET>`), publish the workflow, sync into Payload, then run setup.
 
 For the simplest synchronous Webhook test built by hand, the workflow should:
 
