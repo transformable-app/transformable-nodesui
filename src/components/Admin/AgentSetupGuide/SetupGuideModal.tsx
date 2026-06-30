@@ -9,9 +9,10 @@ import {
   type AgentSetupGuideResponse,
 } from '@/n8n/agents/testAgentSetup'
 import {
+  DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW,
   getRecommendedSampleWorkflow,
   getSampleWorkflowDownloadURL,
-  SAMPLE_N8N_WORKFLOWS,
+  SETUP_GUIDE_SAMPLE_WORKFLOWS,
 } from '@/n8n/agents/sampleWorkflows'
 
 import './index.scss'
@@ -55,7 +56,9 @@ export const AgentSetupGuideModal = ({
   const title =
     result.mode === 'test-setup' ? 'Test agent setup' : `Setup guide${result.agent?.name ? `: ${result.agent.name}` : ''}`
   const transportLabel = getTransportLabel(result.instructions.transport)
-  const recommendedWorkflow = getRecommendedSampleWorkflow(result.instructions.n8nWebhookPath)
+  const recommendedWorkflow =
+    getRecommendedSampleWorkflow(result.instructions.n8nWebhookPath) ??
+    DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW
   const agentRecordDetail = result.agent?.id
     ? 'This agent record is saved in Payload.'
     : result.agent?.slug
@@ -108,7 +111,7 @@ export const AgentSetupGuideModal = ({
             title="Environment variables"
           />
           <ChecklistItem
-            detail={`Import a sample workflow below or create a production ${transportLabel} at ${result.instructions.n8nWebhookPath} with auth matching ${result.instructions.secretReference}, then activate the workflow in n8n.`}
+            detail={`Import a sample workflow below, attach Header Auth matching ${result.instructions.secretReference}, publish it in n8n, and set this agent's endpoint path to match the sample (${recommendedWorkflow.endpointPath} for the default test agent). Async samples also need N8N_CALLBACK_SECRET.`}
             ok={result.checks.workflowOK}
             title={`n8n ${transportLabel.toLowerCase()} workflow`}
           />
@@ -122,23 +125,20 @@ export const AgentSetupGuideModal = ({
 
         <section className="agentSetupGuide__samples">
           <div className="agentSetupGuide__example-header">
-            <strong>Sample n8n workflows</strong>
+            <strong>Sample workflows</strong>
           </div>
           <p className="agentSetupGuide__samples-intro">
-            Download JSON, import into n8n, attach Header Auth (<code>Authorization: Bearer …</code>
-            ), publish, then sync workflows.
-            {recommendedWorkflow ? (
-              <>
-                {' '}
-                Recommended for this agent:{' '}
-                <strong>{recommendedWorkflow.label}</strong> ({recommendedWorkflow.endpointPath}).
-              </>
-            ) : null}
+            Download JSON, import into n8n, attach Header Auth (
+            <code>Authorization: Bearer …</code> using {result.instructions.secretReference}),
+            publish the workflow, then sync workflows. Chat samples return a response immediately;
+            async samples return <code>waiting</code> and need <code>N8N_CALLBACK_SECRET</code>.
+            Start with <strong>{recommendedWorkflow.label}</strong> (
+            {recommendedWorkflow.endpointPath}) unless you need a different endpoint path.
           </p>
           <ul className="agentSetupGuide__samples-list">
-            {SAMPLE_N8N_WORKFLOWS.map((workflow) => {
+            {SETUP_GUIDE_SAMPLE_WORKFLOWS.map((workflow) => {
               const downloadURL = getSampleWorkflowDownloadURL(workflow.filename)
-              const isRecommended = workflow.filename === recommendedWorkflow?.filename
+              const isRecommended = workflow.filename === recommendedWorkflow.filename
 
               return (
                 <li
@@ -210,7 +210,7 @@ export const AgentSetupGuideModal = ({
         </div>
 
         <p className="agentSetupGuide__help">
-          Workflow source files: <code>docs/n8n-workflows/</code>. List API:{' '}
+          Workflow source files in <code>docs/n8n-workflows/</code>. List API:{' '}
           <a href="/api/n8n/sample-workflows">/api/n8n/sample-workflows</a>. Full manual steps:{' '}
           <code>docs/agent-harness-testing.md</code>.
         </p>

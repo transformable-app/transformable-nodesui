@@ -543,6 +543,87 @@ export const listAgentSessions = async ({ req, slug }: { req: AgentRequest; slug
   })
 }
 
+export const deleteAgentSession = async ({
+  req,
+  sessionID,
+}: {
+  req: AgentRequest
+  sessionID: string
+}) => {
+  const session = await req.payload.findByID({
+    collection: 'agent-sessions',
+    depth: 0,
+    id: sessionID,
+    overrideAccess: false,
+    req,
+    user: req.user,
+  })
+
+  if (!session) throw new AgentHarnessError('not-found', 'Session not found.', 404)
+
+  const runs = await req.payload.find({
+    collection: 'agent-runs',
+    depth: 0,
+    limit: 100,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: {
+      session: {
+        equals: sessionID,
+      },
+    },
+  })
+
+  for (const run of runs.docs) {
+    if (!isTerminalRunStatus(run.status)) {
+      await cancelAgentRun({ req, runID: String(run.id) })
+    }
+  }
+
+  await req.payload.delete({
+    collection: 'agent-approvals',
+    overrideAccess: true,
+    req,
+    where: {
+      session: {
+        equals: sessionID,
+      },
+    },
+  })
+
+  await req.payload.delete({
+    collection: 'agent-messages',
+    overrideAccess: true,
+    req,
+    where: {
+      session: {
+        equals: sessionID,
+      },
+    },
+  })
+
+  await req.payload.delete({
+    collection: 'agent-runs',
+    overrideAccess: true,
+    req,
+    where: {
+      session: {
+        equals: sessionID,
+      },
+    },
+  })
+
+  await req.payload.delete({
+    collection: 'agent-sessions',
+    id: sessionID,
+    overrideAccess: true,
+    req,
+  })
+
+  return { deleted: true, sessionID }
+}
+
 export const sendAgentMessage = async ({
   req,
   sessionID,
@@ -705,7 +786,7 @@ export const sendAgentMessage = async ({
         firstByteMS: finishedAt.getTime() - startedAt.getTime(),
         n8nExecutionID: response.n8nExecutionID,
         outputPreview: toPreview(response.content),
-        sessionActiveLock: status === 'waiting' ? sessionID : null,
+        sessionActiveLock: status === 'waiting' ? sessionID : `released:${run.id}`,
         status,
         usage: asPayloadJSON(response.usage ? redactValue(response.usage) : undefined),
       },
@@ -1347,7 +1428,7 @@ export const resolveAgentApproval = async ({
   }
 
   const resumeURL = assertSameServerURL({
-    baseURL: (server as unknown as Record<string, unknown>).url,
+    baseURL: (server as unknown as Record<string, unknown>).baseURL,
     targetURL: approval.resumeURL,
   })
 
@@ -1473,7 +1554,7 @@ export const updateRunFromCallback = async (
         })
         if (server) {
           assertSameServerURL({
-            baseURL: (server as unknown as Record<string, unknown>).url,
+            baseURL: (server as unknown as Record<string, unknown>).baseURL,
             targetURL: approval.resumeURL,
           })
         }

@@ -1,11 +1,13 @@
 import type { CollectionConfig } from 'payload'
 
 import { checkRole } from '@/access/utilities'
+import { agentApprovalCollectionEndpoints } from '@/endpoints/agents'
 
 const ownedApprovalConstraint = (userID: string) => ({ user: { equals: userID } })
 
 export const AgentApprovals: CollectionConfig = {
   slug: 'agent-approvals',
+  endpoints: agentApprovalCollectionEndpoints,
   labels: {
     plural: 'Agent Approvals',
     singular: 'Agent Approval',

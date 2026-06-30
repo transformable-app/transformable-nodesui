@@ -6,7 +6,7 @@ Importable n8n workflow JSON files for testing the Payload agent harness. They m
 
 | File | Production path | Purpose |
 | --- | --- | --- |
-| [test-agent-webhook.json](./test-agent-webhook.json) | `/webhook/test-agent` | Canonical synchronous smoke test. Returns the default harness success payload. |
+| [test-agent-webhook.json](./test-agent-webhook.json) | `/webhook/test-agent` | Canonical Agent Chat smoke test. Webhook → AI Agent (OpenAI Chat Model, memory, Calculator tool) → harness JSON response. |
 | [test-agent-echo-webhook.json](./test-agent-echo-webhook.json) | `/webhook/test-agent-echo` | Returns `Echo: <user text>` from the harness `input.text` field. |
 | [test-agent-async-waiting.json](./test-agent-async-waiting.json) | `/webhook/test-agent-async` | Returns `status: "waiting"` only. Use with a manual Payload callback curl. |
 | [test-agent-async-callback.json](./test-agent-async-callback.json) | `/webhook/test-agent-async-callback` | Returns `waiting`, then POSTs a completion callback to Payload in the same execution. |
@@ -20,7 +20,7 @@ Start with **test-agent-webhook.json** when using **Set up test agent** on the d
    - File: `GET /api/n8n/sample-workflows/<filename>` (for example `/api/n8n/sample-workflows/test-agent-webhook.json`)
 2. In n8n, open **Workflows** → **Import from file** (or paste JSON).
 3. Select the downloaded JSON (or one of the files from this folder in the repo).
-3. Create the credentials below and attach them to the **Webhook** node (and **Callback Payload** node for the async callback workflow).
+3. Create the credentials below and attach them to the **Webhook** node (and **OpenAI Chat Model** for the main chat sample; **Callback Payload** for the async callback workflow).
 4. Set n8n environment variables if required (see below).
 5. **Publish / activate** the workflow so the production URL is used (`/webhook/...`, not `/webhook-test/...`).
 6. In Payload, run **Sync n8n data now** or **Sync workflows first** in the setup guide.
@@ -43,6 +43,17 @@ Used by the **Webhook** node on every sample workflow.
 Example: if Payload has `TEST_AGENT_WEBHOOK_SECRET=replace-me`, set the credential value to `Bearer replace-me`.
 
 The harness sends `Authorization: Bearer …` on every invocation. The value must match exactly.
+
+### OpenAI account (test-agent-webhook only)
+
+Used by the **OpenAI Chat Model** sub-node on [test-agent-webhook.json](./test-agent-webhook.json).
+
+| Field | Value |
+| --- | --- |
+| Type | OpenAI API |
+| API Key | Your OpenAI key |
+
+After import, reconnect the credential on **OpenAI Chat Model**. Swap the model, system prompt, memory settings, or replace **Calculator** with your own tool sub-nodes as needed.
 
 ### Payload Callback Secret (async callback workflow only)
 
@@ -73,7 +84,7 @@ Payload-side vars (not in these JSON files):
 
 ```json
 {
-  "content": "Harness response received",
+  "content": "<assistant text from AI Agent>",
   "status": "succeeded",
   "n8nExecutionID": "<execution id>"
 }
@@ -121,6 +132,6 @@ Use **Set up test agent** for the first row only. For the others, create an **Ag
 
 ## Notes
 
-- These are minimal test workflows, not production agents.
+- [test-agent-webhook.json](./test-agent-webhook.json) ships the key Agent Chat nodes (Webhook, input mapping, AI Agent, chat model, memory, placeholder tool, response shaping). Other samples stay minimal on purpose.
 - Node `typeVersion` values target recent n8n releases; n8n may prompt to upgrade nodes after import.
 - Chat Trigger samples are not included yet; the harness also supports `chat-trigger` transport with a published Chat Trigger workflow (see [agent-harness-user-guide.md](../agent-harness-user-guide.md)).

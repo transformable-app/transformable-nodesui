@@ -28,6 +28,7 @@ export const Servers: CollectionConfig = {
   },
   defaultPopulate: {
     apiPath: true,
+    baseURL: true,
     dashboardURL: true,
     environment: true,
     lastSuccessfulSyncAt: true,

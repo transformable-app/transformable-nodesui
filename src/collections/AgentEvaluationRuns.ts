@@ -1,9 +1,11 @@
 import type { CollectionConfig } from 'payload'
 
 import { adminAuthenticatedAndNotContentManager } from '@/access/contentManagerRestrictions'
+import { agentEvaluationRunCollectionEndpoints } from '@/endpoints/agents'
 
 export const AgentEvaluationRuns: CollectionConfig = {
   slug: 'agent-evaluation-runs',
+  endpoints: agentEvaluationRunCollectionEndpoints,
   labels: {
     plural: 'Agent Evaluation Runs',
     singular: 'Agent Evaluation Run',

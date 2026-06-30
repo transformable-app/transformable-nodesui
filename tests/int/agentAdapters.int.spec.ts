@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildChatTriggerBody, parseChatTriggerResponse } from '@/n8n/agents/chatTriggerAdapter'
 import { assertSameServerURL, buildAgentEndpoint } from '@/n8n/agents/buildEndpoint'
+import { invokeN8nAgent } from '@/n8n/agents/adapters'
 import { buildWebhookBody, parseWebhookResponse } from '@/n8n/agents/webhookAdapter'
 import type { AgentInvocation } from '@/n8n/agents/types'
 
@@ -21,6 +22,10 @@ const invocation: AgentInvocation = {
 }
 
 describe('agent transport adapters', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('maps harness invocations to n8n Chat Trigger metadata', () => {
     expect(buildChatTriggerBody(invocation)).toEqual({
       action: 'sendMessage',
@@ -89,5 +94,39 @@ describe('agent transport adapters', () => {
         targetURL: 'https://attacker.example.com/webhook-waiting/resume/abc',
       }),
     ).toThrow('configured server')
+  })
+
+  it('retries transient fetch failures before wrapping as workflow errors', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            content: 'Second request succeeded',
+            status: 'succeeded',
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      invokeN8nAgent({
+        agent: {
+          authStrategy: 'server-secret',
+          endpointPath: '/webhook/test-agent',
+          transport: 'webhook',
+        },
+        invocation,
+        server: {
+          baseURL: 'https://n8n.example.com',
+        },
+      }),
+    ).resolves.toMatchObject({
+      content: 'Second request succeeded',
+      status: 'succeeded',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })

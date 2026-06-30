@@ -24,8 +24,130 @@
     },
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1a1a1a1-1111-4111-8111-111111111101",
+              "name": "chatInput",
+              "type": "string",
+              "value": "={{ ($json.body ?? $json).input?.text ?? '' }}"
+            },
+            {
+              "id": "a1a1a1a1-1111-4111-8111-111111111102",
+              "name": "sessionID",
+              "type": "string",
+              "value": "={{ ($json.body ?? $json).sessionID ?? $execution.id }}"
+            },
+            {
+              "id": "a1a1a1a1-1111-4111-8111-111111111103",
+              "name": "requestID",
+              "type": "string",
+              "value": "={{ ($json.body ?? $json).requestID ?? $execution.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1b1b1b1-2222-4222-8222-222222222201",
+      "name": "Map Harness Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are the Payload harness test agent. Reply helpfully and concisely. Use the Calculator tool when the user asks for math. If chatInput is empty, greet the user and confirm the harness is working."
+        }
+      },
+      "id": "c1c1c1c1-3333-4333-8333-333333333301",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "d1d1d1d1-4444-4444-8444-444444444401",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [520, 520],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Map Harness Input').item.json.sessionID }}",
+        "contextWindowLength": 10
+      },
+      "id": "e1e1e1e1-5555-4555-8555-555555555501",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [680, 520]
+    },
+    {
+      "parameters": {},
+      "id": "f1f1f1f1-6666-4666-8666-666666666601",
+      "name": "Calculator",
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [840, 520]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2b2b2b2-1111-4111-8111-111111111101",
+              "name": "content",
+              "type": "string",
+              "value": "={{ $json.output ?? $json.text ?? 'Harness response received' }}"
+            },
+            {
+              "id": "b2b2b2b2-1111-4111-8111-111111111102",
+              "name": "status",
+              "type": "string",
+              "value": "succeeded"
+            },
+            {
+              "id": "b2b2b2b2-1111-4111-8111-111111111103",
+              "name": "n8nExecutionID",
+              "type": "string",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2a2a2a2-7777-4777-8777-777777777701",
+      "name": "Build Harness Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"content\": \"Harness response received\", \"status\": \"succeeded\", \"n8nExecutionID\": $execution.id } }}",
+        "responseBody": "={{ $json }}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -41,7 +163,20 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [420, 300]
+      "position": [1040, 300]
+    },
+    {
+      "parameters": {
+        "content": "## After import\n\n1. Attach **Payload Test Agent Bearer** on the Webhook node.\n2. Attach **OpenAI account** on **OpenAI Chat Model**.\n3. Replace **Calculator** with your own tools, or add more tool sub-nodes.\n4. Publish the workflow, sync into Payload, then run **Set up test agent**.\n\nPayload sends `input.text`, `sessionID`, and `requestID` in the webhook body. **Map Harness Input** normalizes those fields for the agent. **Build Harness Response** shapes the JSON Payload expects.",
+        "height": 260,
+        "width": 420,
+        "color": 5
+      },
+      "id": "s1s1s1s1-8888-4888-8888-888888888801",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-40, 40]
     }
   ],
   "connections": {
@@ -49,8 +184,74 @@
       "main": [
         [
           {
+            "node": "Map Harness Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Harness Input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Harness Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Harness Response": {
+      "main": [
+        [
+          {
             "node": "Respond to Webhook",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
             "index": 0
           }
         ]

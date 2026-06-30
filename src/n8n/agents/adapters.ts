@@ -18,6 +18,20 @@ const assertSupportedAuthStrategy = (agent: Record<string, unknown>) => {
   )
 }
 
+const isRetryableFetchError = (error: unknown) =>
+  error instanceof TypeError || (error instanceof Error && error.name === 'SocketError')
+
+const postWithRetry = async (endpoint: URL, init: RequestInit) => {
+  try {
+    return await fetch(endpoint, init)
+  } catch (error) {
+    if (init.signal instanceof AbortSignal && init.signal.aborted) throw error
+    if (!isRetryableFetchError(error)) throw error
+
+    return fetch(endpoint, init)
+  }
+}
+
 export const invokeN8nAgent = async ({
   agent,
   invocation,
@@ -49,7 +63,7 @@ export const invokeN8nAgent = async ({
     const body =
       transport === 'chat-trigger' ? buildChatTriggerBody(invocation) : buildWebhookBody(invocation)
 
-    const response = await fetch(endpoint, {
+    const response = await postWithRetry(endpoint, {
       body: JSON.stringify(body),
       headers,
       method: 'POST',

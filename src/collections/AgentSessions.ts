@@ -1,9 +1,11 @@
 import type { CollectionConfig } from 'payload'
 
 import { checkRole } from '@/access/utilities'
+import { agentSessionCollectionEndpoints } from '@/endpoints/agents'
 
 export const AgentSessions: CollectionConfig = {
   slug: 'agent-sessions',
+  endpoints: agentSessionCollectionEndpoints,
   labels: {
     plural: 'Agent Sessions',
     singular: 'Agent Session',

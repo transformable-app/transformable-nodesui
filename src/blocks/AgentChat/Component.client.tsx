@@ -3,12 +3,14 @@
 import {
   Check,
   ChevronLeft,
+  Eraser,
   Loader2,
   MessageSquareText,
   RotateCcw,
   Send,
   Star,
   Square,
+  Trash2,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -88,6 +90,7 @@ const initialMessages = (agent: AgentSummary): AgentMessage[] =>
 
 export function AgentChatClient({ agent, description, title }: Props) {
   const [sessionID, setSessionID] = useState<string | null>(null)
+  const [isDraftSession, setIsDraftSession] = useState(false)
   const [messages, setMessages] = useState<AgentMessage[]>(() => initialMessages(agent))
   const [messagePage, setMessagePage] = useState(1)
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
@@ -97,6 +100,7 @@ export function AgentChatClient({ agent, description, title }: Props) {
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeRun, setActiveRun] = useState<RunState | null>(null)
+  const [deletingSessionID, setDeletingSessionID] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const lastPromptRef = useRef('')
 
@@ -119,6 +123,7 @@ export function AgentChatClient({ agent, description, title }: Props) {
     if (!data.session?.id) throw new Error('Agent session response was invalid.')
 
     setSessionID(data.session.id)
+    setIsDraftSession(false)
     setSessions((current) => [data.session as AgentSession, ...current])
     return data.session.id
   }, [agent.name, agent.slug, sessionID])
@@ -130,11 +135,11 @@ export function AgentChatClient({ agent, description, title }: Props) {
     const data = (await response.json()) as { docs?: AgentSession[] }
     if (Array.isArray(data.docs)) {
       setSessions(data.docs)
-      if (!sessionID && data.docs[0]?.id) {
+      if (!sessionID && !isDraftSession && data.docs[0]?.id) {
         setSessionID(data.docs[0].id)
       }
     }
-  }, [agent.slug, sessionID])
+  }, [agent.slug, isDraftSession, sessionID])
 
   const loadHistory = useCallback(
     async (id: string, page = 1) => {
@@ -168,7 +173,10 @@ export function AgentChatClient({ agent, description, title }: Props) {
   }, [])
 
   useEffect(() => {
-    if (!sessionID) return
+    if (!sessionID) {
+      setApprovals([])
+      return
+    }
     setMessagePage(1)
     void loadHistory(sessionID)
     void loadApprovals(sessionID)
@@ -367,6 +375,54 @@ export function AgentChatClient({ agent, description, title }: Props) {
     if (sessionID) void loadHistory(sessionID)
   }
 
+  const clearChat = () => {
+    abortRef.current?.abort()
+    setSessionID(null)
+    setIsDraftSession(true)
+    setMessages(initialMessages(agent))
+    setMessagePage(1)
+    setHasOlderMessages(false)
+    setApprovals([])
+    setInput('')
+    setError(null)
+    setActiveRun(null)
+    lastPromptRef.current = ''
+  }
+
+  const deleteSession = async (id: string) => {
+    const session = sessions.find((item) => item.id === id)
+    const confirmed = window.confirm(`Delete "${session?.title || 'Session'}"?`)
+    if (!confirmed) return
+
+    setDeletingSessionID(id)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/agent-sessions/${id}/delete`, { method: 'POST' })
+      const data = (await response.json().catch(() => ({}))) as { error?: string }
+
+      if (!response.ok) {
+        setError(data.error || 'Could not delete chat.')
+        return
+      }
+
+      setSessions((current) => current.filter((item) => item.id !== id))
+
+      if (sessionID === id) {
+        setSessionID(null)
+        setIsDraftSession(true)
+        setMessages(initialMessages(agent))
+        setMessagePage(1)
+        setHasOlderMessages(false)
+        setApprovals([])
+        setActiveRun(null)
+        lastPromptRef.current = ''
+      }
+    } finally {
+      setDeletingSessionID(null)
+    }
+  }
+
   const canRetry = useMemo(() => Boolean(lastPromptRef.current && !isSending), [isSending])
 
   return (
@@ -401,18 +457,40 @@ export function AgentChatClient({ agent, description, title }: Props) {
           {sessions.length > 0 ? (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {sessions.map((session) => (
-                <Button
-                  key={session.id}
-                  onClick={() => {
-                    setSessionID(session.id)
-                    setError(null)
-                  }}
-                  size="sm"
-                  type="button"
-                  variant={session.id === sessionID ? 'secondary' : 'outline'}
-                >
-                  {session.title || 'Session'}
-                </Button>
+                <div className="flex shrink-0 items-center gap-1" key={session.id}>
+                  <Button
+                    className={
+                      session.id === sessionID
+                        ? 'bg-secondary text-background hover:bg-secondary/90 hover:text-background'
+                        : 'text-foreground hover:text-foreground'
+                    }
+                    onClick={() => {
+                      setIsDraftSession(false)
+                      setSessionID(session.id)
+                      setError(null)
+                    }}
+                    size="sm"
+                    type="button"
+                    variant={session.id === sessionID ? 'secondary' : 'outline'}
+                  >
+                    {session.title || 'Session'}
+                  </Button>
+                  <Button
+                    aria-label={`Delete ${session.title || 'Session'}`}
+                    disabled={deletingSessionID === session.id}
+                    onClick={() => void deleteSession(session.id)}
+                    size="icon"
+                    title={`Delete ${session.title || 'Session'}`}
+                    type="button"
+                    variant="ghost"
+                  >
+                    {deletingSessionID === session.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               ))}
             </div>
           ) : null}
@@ -496,6 +574,16 @@ export function AgentChatClient({ agent, description, title }: Props) {
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              disabled={isSending}
+              onClick={clearChat}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Eraser className="mr-2 h-4 w-4" />
+              New chat
+            </Button>
             <Button
               disabled={!canRetry}
               onClick={() => void sendMessage(lastPromptRef.current)}

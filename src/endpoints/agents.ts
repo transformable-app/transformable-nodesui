@@ -3,6 +3,7 @@ import { APIError, type Endpoint } from 'payload'
 import {
   cancelAgentRun,
   createAgentSession,
+  deleteAgentSession,
   listAgentApprovals,
   listAgentMessages,
   listAgentSessions,
@@ -155,9 +156,9 @@ const upsertAgentEvaluationRun = async (req: Parameters<Endpoint['handler']>[0])
   })
 }
 
-export const agentEndpoints: Endpoint[] = [
+export const agentSessionCollectionEndpoints: Endpoint[] = [
   {
-    path: '/agent-sessions/:id/messages',
+    path: '/:id/messages',
     method: 'post',
     handler: async (req) => {
       try {
@@ -180,7 +181,7 @@ export const agentEndpoints: Endpoint[] = [
     },
   },
   {
-    path: '/agent-sessions/:id/messages',
+    path: '/:id/messages',
     method: 'get',
     handler: async (req) => {
       try {
@@ -197,7 +198,7 @@ export const agentEndpoints: Endpoint[] = [
     },
   },
   {
-    path: '/agent-sessions/:id/approvals',
+    path: '/:id/approvals',
     method: 'get',
     handler: async (req) => {
       try {
@@ -213,7 +214,26 @@ export const agentEndpoints: Endpoint[] = [
     },
   },
   {
-    path: '/agent-runs/:requestID/events',
+    path: '/:id/delete',
+    method: 'post',
+    handler: async (req) => {
+      try {
+        const result = await deleteAgentSession({
+          req: requireUser(req),
+          sessionID: String(req.routeParams?.id ?? ''),
+        })
+
+        return Response.json(result)
+      } catch (error) {
+        return handleAgentError(error)
+      }
+    },
+  },
+]
+
+export const agentRunCollectionEndpoints: Endpoint[] = [
+  {
+    path: '/:requestID/events',
     method: 'post',
     handler: async (req) => {
       try {
@@ -225,7 +245,7 @@ export const agentEndpoints: Endpoint[] = [
     },
   },
   {
-    path: '/agent-runs/:id/feedback',
+    path: '/:id/feedback',
     method: 'post',
     handler: async (req) => {
       const userReq = requireUser(req)
@@ -255,7 +275,7 @@ export const agentEndpoints: Endpoint[] = [
     },
   },
   {
-    path: '/agent-runs/:id/cancel',
+    path: '/:id/cancel',
     method: 'post',
     handler: async (req) => {
       try {
@@ -270,8 +290,11 @@ export const agentEndpoints: Endpoint[] = [
       }
     },
   },
+]
+
+export const agentApprovalCollectionEndpoints: Endpoint[] = [
   {
-    path: '/agent-approvals/:id/resolve',
+    path: '/:id/resolve',
     method: 'post',
     handler: async (req) => {
       try {
@@ -293,8 +316,11 @@ export const agentEndpoints: Endpoint[] = [
       }
     },
   },
+]
+
+export const agentEvaluationRunCollectionEndpoints: Endpoint[] = [
   {
-    path: '/agent-evaluation-runs/events',
+    path: '/events',
     method: 'post',
     handler: async (req) => {
       try {
@@ -306,6 +332,8 @@ export const agentEndpoints: Endpoint[] = [
     },
   },
 ]
+
+export const agentEndpoints: Endpoint[] = []
 
 export const agentCollectionEndpoints: Endpoint[] = [
   { ...agentSetupGuideEndpoint, path: '/setup-guide' },

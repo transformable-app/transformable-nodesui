@@ -5,32 +5,53 @@ export type SampleN8nWorkflow = {
   label: string
 }
 
-export const SAMPLE_N8N_WORKFLOWS: SampleN8nWorkflow[] = [
-  {
-    description: 'Canonical synchronous smoke test for the dashboard preset.',
-    endpointPath: '/webhook/test-agent',
-    filename: 'test-agent-webhook.json',
-    label: 'Test Agent (sync)',
-  },
+/** Default sample for the dashboard test-agent preset and Agent Chat block smoke tests. */
+export const DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW: SampleN8nWorkflow = {
+  description:
+    'Webhook + AI Agent workflow for the Agent Chat block. Includes OpenAI Chat Model, memory, a placeholder Calculator tool, and harness response shaping.',
+  endpointPath: '/webhook/test-agent',
+  filename: 'test-agent-webhook.json',
+  label: 'Agent Chat (Webhook)',
+}
+
+/** @deprecated Use DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW */
+export const AGENT_CHAT_SAMPLE_WORKFLOW = DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW
+
+/** Synchronous chat samples for the Agent Chat block. */
+export const AGENT_CHAT_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
+  DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW,
   {
     description: 'Echoes harness input.text in the assistant response.',
     endpointPath: '/webhook/test-agent-echo',
     filename: 'test-agent-echo-webhook.json',
-    label: 'Test Agent Echo',
-  },
-  {
-    description: 'Returns waiting; complete the run with a manual Payload callback curl.',
-    endpointPath: '/webhook/test-agent-async',
-    filename: 'test-agent-async-waiting.json',
-    label: 'Async Waiting',
-  },
-  {
-    description: 'Returns waiting, then POSTs a completion callback to Payload.',
-    endpointPath: '/webhook/test-agent-async-callback',
-    filename: 'test-agent-async-callback.json',
-    label: 'Async Callback',
+    label: 'Agent Chat Echo (Webhook)',
   },
 ]
+
+const ASYNC_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
+  {
+    description:
+      'Returns waiting; complete the run with a manual Payload callback curl. Requires N8N_CALLBACK_SECRET.',
+    endpointPath: '/webhook/test-agent-async',
+    filename: 'test-agent-async-waiting.json',
+    label: 'Async Waiting (Webhook)',
+  },
+  {
+    description:
+      'Returns waiting, then POSTs a completion callback to Payload. Requires N8N_CALLBACK_SECRET and PAYLOAD_PUBLIC_URL on the n8n host.',
+    endpointPath: '/webhook/test-agent-async-callback',
+    filename: 'test-agent-async-callback.json',
+    label: 'Async Callback (Webhook)',
+  },
+]
+
+export const SAMPLE_N8N_WORKFLOWS: SampleN8nWorkflow[] = [
+  ...AGENT_CHAT_SAMPLE_WORKFLOWS,
+  ...ASYNC_SAMPLE_WORKFLOWS,
+]
+
+/** All importable samples shown in the admin setup guide modal. */
+export const SETUP_GUIDE_SAMPLE_WORKFLOWS = SAMPLE_N8N_WORKFLOWS
 
 export const SAMPLE_N8N_WORKFLOW_FILENAMES = new Set(
   SAMPLE_N8N_WORKFLOWS.map((workflow) => workflow.filename),

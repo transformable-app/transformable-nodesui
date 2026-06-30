@@ -1,11 +1,13 @@
 import type { CollectionConfig } from 'payload'
 
 import { checkRole } from '@/access/utilities'
+import { agentRunCollectionEndpoints } from '@/endpoints/agents'
 
 const ownedRunConstraint = (userID: string) => ({ user: { equals: userID } })
 
 export const AgentRuns: CollectionConfig = {
   slug: 'agent-runs',
+  endpoints: agentRunCollectionEndpoints,
   labels: {
     plural: 'Agent Runs',
     singular: 'Agent Run',
