@@ -53,6 +53,132 @@ const getRemoteID = (response: Record<string, unknown>): string | undefined => {
   return typeof id === 'string' || typeof id === 'number' ? String(id) : undefined
 }
 
+const normalizePath = (path: string) => path.replace(/\.\d+(?=\.|$)/g, '.*')
+
+const collectDocumentPaths = (value: unknown, prefix = ''): string[] => {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) =>
+      collectDocumentPaths(item, prefix ? `${prefix}.${index}` : String(index)),
+    )
+  }
+
+  if (!isPlainObject(value)) return prefix ? [prefix] : []
+
+  const paths: string[] = []
+  for (const [key, child] of Object.entries(value)) {
+    const nextPath = prefix ? `${prefix}.${key}` : key
+    paths.push(nextPath)
+    paths.push(...collectDocumentPaths(child, nextPath))
+  }
+  return paths
+}
+
+const getCollectionSchema = (site: PayloadSite, collection: string): Record<string, unknown> | null => {
+  const profile = site.schemaProfile
+  if (!isPlainObject(profile) || !Array.isArray(profile.collections)) return null
+
+  return (
+    profile.collections.find(
+      (candidate): candidate is Record<string, unknown> =>
+        isPlainObject(candidate) && candidate.slug === collection,
+    ) ?? null
+  )
+}
+
+const getAllowedBlockSlugs = (collectionSchema: Record<string, unknown> | null) => {
+  if (!collectionSchema || !Array.isArray(collectionSchema.blocks)) return null
+
+  const slugs = collectionSchema.blocks
+    .map((block) => (isPlainObject(block) ? getString(block.slug) : undefined))
+    .filter((slug): slug is string => Boolean(slug))
+
+  return slugs.length > 0 ? new Set(slugs) : null
+}
+
+const collectBlockTypes = (value: unknown): string[] => {
+  const blockTypes: string[] = []
+  if (Array.isArray(value)) {
+    for (const item of value) blockTypes.push(...collectBlockTypes(item))
+    return blockTypes
+  }
+
+  if (!isPlainObject(value)) return blockTypes
+
+  const blockType = getString(value.blockType)
+  if (blockType) blockTypes.push(blockType)
+
+  for (const child of Object.values(value)) {
+    blockTypes.push(...collectBlockTypes(child))
+  }
+
+  return blockTypes
+}
+
+const getFieldAllowlist = (site: PayloadSite, collection: string) => {
+  const allowlist = site.fieldAllowlists?.find((entry) => entry.collection === collection)
+  return allowlist?.paths?.filter((path): path is string => typeof path === 'string') ?? []
+}
+
+const isPathAllowed = (path: string, allowedPaths: string[]) => {
+  const normalizedPath = normalizePath(path)
+  return allowedPaths.some((allowedPath) => {
+    const normalizedAllowedPath = normalizePath(allowedPath)
+    return (
+      normalizedPath === normalizedAllowedPath ||
+      normalizedPath.startsWith(`${normalizedAllowedPath}.`) ||
+      (normalizedAllowedPath.endsWith('.*') &&
+        normalizedPath.startsWith(normalizedAllowedPath.slice(0, -2)))
+    )
+  })
+}
+
+const validateDraftDocumentAgainstSite = ({
+  collection,
+  document,
+  mediaRequests,
+  site,
+}: {
+  collection: string
+  document: Record<string, unknown>
+  mediaRequests?: CMSDraftMediaRequest[]
+  site: PayloadSite
+}) => {
+  const collectionSchema = getCollectionSchema(site, collection)
+  if (!collectionSchema) {
+    throw new APIError(`Schema profile does not include collection "${collection}".`, 400)
+  }
+
+  const allowedPaths = getFieldAllowlist(site, collection)
+  if (allowedPaths.length > 0) {
+    const disallowedPath = collectDocumentPaths(document).find(
+      (path) => !isPathAllowed(path, allowedPaths),
+    )
+    if (disallowedPath) {
+      throw new APIError(`Generated document field "${disallowedPath}" is not allowlisted.`, 400)
+    }
+
+    const disallowedMediaPath = mediaRequests?.find(
+      (request) => !isPathAllowed(request.targetFieldPath, allowedPaths),
+    )
+    if (disallowedMediaPath) {
+      throw new APIError(
+        `Media target field "${disallowedMediaPath.targetFieldPath}" is not allowlisted.`,
+        400,
+      )
+    }
+  }
+
+  const allowedBlockSlugs = getAllowedBlockSlugs(collectionSchema)
+  if (allowedBlockSlugs) {
+    const disallowedBlockType = collectBlockTypes(document).find(
+      (blockType) => !allowedBlockSlugs.has(blockType),
+    )
+    if (disallowedBlockType) {
+      throw new APIError(`Block type "${disallowedBlockType}" is not allowed for this site.`, 400)
+    }
+  }
+}
+
 const parseMediaRequest = (value: unknown, index: number): CMSDraftMediaRequest => {
   if (!isPlainObject(value)) {
     throw new APIError(`mediaRequests[${index}] must be an object.`, 400)
@@ -383,6 +509,12 @@ export const writeCMSDraftFromTaskOutput = async ({
   const site = await loadPayloadSite({ idOrSlug: draft.target.payloadSite, req })
   assertSiteCanWrite(site, draft.target.collection)
   const document = { ...draft.document }
+  validateDraftDocumentAgainstSite({
+    collection: draft.target.collection,
+    document,
+    mediaRequests: draft.mediaRequests,
+    site,
+  })
   const mediaIDs = await resolveMediaRequests({
     document,
     mediaRequests: draft.mediaRequests,

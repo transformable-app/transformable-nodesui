@@ -110,7 +110,6 @@ export default buildConfig({
   collections: [
     Pages,
     Media,
-    PayloadSites,
     Servers,
     Workflows,
     Credentials,
@@ -128,6 +127,7 @@ export default buildConfig({
     AgentRuns,
     Roles,
     Users,
+    PayloadSites,
   ],
   cors: [getServerSideURL(), 'https://payloadcms.3twenty9.com'].filter(
     (url): url is string => Boolean(url) && typeof url === 'string',

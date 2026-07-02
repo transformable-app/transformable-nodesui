@@ -30,7 +30,6 @@ export const PayloadSites: CollectionConfig = {
       'schemaProfileStatus',
       'writeBackEnabled',
     ],
-    group: 'Agents',
     useAsTitle: 'name',
   },
   defaultPopulate: {
@@ -43,6 +42,16 @@ export const PayloadSites: CollectionConfig = {
     writeBackEnabled: true,
   },
   fields: [
+    {
+      name: 'siteActions',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@/components/Admin/PayloadSiteActions#PayloadSiteActionsField',
+        },
+        position: 'sidebar',
+      },
+    },
     { name: 'name', type: 'text', required: true },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
     { name: 'description', type: 'textarea' },

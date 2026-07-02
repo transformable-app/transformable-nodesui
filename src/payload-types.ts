@@ -69,7 +69,6 @@ export interface Config {
   collections: {
     pages: Page;
     media: Media;
-    'payload-sites': PayloadSite;
     servers: Server;
     workflows: Workflow;
     credentials: Credential;
@@ -87,6 +86,7 @@ export interface Config {
     'agent-runs': AgentRun;
     roles: Role;
     users: User;
+    'payload-sites': PayloadSite;
     forms: Form;
     'form-submissions': FormSubmission;
     'payload-kv': PayloadKv;
@@ -104,7 +104,6 @@ export interface Config {
   collectionsSelect: {
     pages: PagesSelect<false> | PagesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
-    'payload-sites': PayloadSitesSelect<false> | PayloadSitesSelect<true>;
     servers: ServersSelect<false> | ServersSelect<true>;
     workflows: WorkflowsSelect<false> | WorkflowsSelect<true>;
     credentials: CredentialsSelect<false> | CredentialsSelect<true>;
@@ -122,6 +121,7 @@ export interface Config {
     'agent-runs': AgentRunsSelect<false> | AgentRunsSelect<true>;
     roles: RolesSelect<false> | RolesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
+    'payload-sites': PayloadSitesSelect<false> | PayloadSitesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -911,83 +911,6 @@ export interface FolderInterface {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "payload-sites".
- */
-export interface PayloadSite {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  enabled: boolean;
-  /**
-   * Only enable after the companion plugin is connected and the synced schema profile has been reviewed.
-   */
-  writeBackEnabled?: boolean | null;
-  /**
-   * Trusted origin for the target Payload site, for example https://cms.example.com.
-   */
-  baseURL: string;
-  /**
-   * Optional editor/admin URL root used for review links.
-   */
-  adminURL?: string | null;
-  /**
-   * Auth collection slug used in Payload API key auth headers.
-   */
-  apiKeyAuthCollection: string;
-  /**
-   * Environment variable name containing the target Payload API key.
-   */
-  apiKeySecretReference: string;
-  schemaProfileEndpoint: string;
-  companionPluginStatus: 'missing' | 'connected' | 'stale' | 'error';
-  companionPluginLastCheckedAt?: string | null;
-  companionPluginError?: string | null;
-  schemaProfileStatus: 'missing' | 'synced' | 'stale' | 'error';
-  schemaProfileSyncedAt?: string | null;
-  schemaProfileHash?: string | null;
-  schemaProfile?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  capabilities?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  /**
-   * Writable target-site collections. Generated output is still validated against the schema profile.
-   */
-  allowedCollections: string[];
-  /**
-   * NodesUI roles allowed to generate drafts for this site.
-   */
-  allowedRoles?: (string | Role)[] | null;
-  fieldAllowlists?:
-    | {
-        collection: string;
-        paths: string[];
-        id?: string | null;
-      }[]
-    | null;
-  mediaPolicy: {
-    allowedMimeTypes?: string[] | null;
-    maxFileSizeBytes: number;
-  };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "credentials".
  */
 export interface Credential {
@@ -1410,6 +1333,83 @@ export interface AgentPlanTask {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-sites".
+ */
+export interface PayloadSite {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  enabled: boolean;
+  /**
+   * Only enable after the companion plugin is connected and the synced schema profile has been reviewed.
+   */
+  writeBackEnabled?: boolean | null;
+  /**
+   * Trusted origin for the target Payload site, for example https://cms.example.com.
+   */
+  baseURL: string;
+  /**
+   * Optional editor/admin URL root used for review links.
+   */
+  adminURL?: string | null;
+  /**
+   * Auth collection slug used in Payload API key auth headers.
+   */
+  apiKeyAuthCollection: string;
+  /**
+   * Environment variable name containing the target Payload API key.
+   */
+  apiKeySecretReference: string;
+  schemaProfileEndpoint: string;
+  companionPluginStatus: 'missing' | 'connected' | 'stale' | 'error';
+  companionPluginLastCheckedAt?: string | null;
+  companionPluginError?: string | null;
+  schemaProfileStatus: 'missing' | 'synced' | 'stale' | 'error';
+  schemaProfileSyncedAt?: string | null;
+  schemaProfileHash?: string | null;
+  schemaProfile?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  capabilities?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Writable target-site collections. Generated output is still validated against the schema profile.
+   */
+  allowedCollections: string[];
+  /**
+   * NodesUI roles allowed to generate drafts for this site.
+   */
+  allowedRoles?: (string | Role)[] | null;
+  fieldAllowlists?:
+    | {
+        collection: string;
+        paths: string[];
+        id?: string | null;
+      }[]
+    | null;
+  mediaPolicy: {
+    allowedMimeTypes?: string[] | null;
+    maxFileSizeBytes: number;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "agent-artifacts".
  */
 export interface AgentArtifact {
@@ -1640,10 +1640,6 @@ export interface PayloadLockedDocument {
         value: string | Media;
       } | null)
     | ({
-        relationTo: 'payload-sites';
-        value: string | PayloadSite;
-      } | null)
-    | ({
         relationTo: 'servers';
         value: string | Server;
       } | null)
@@ -1710,6 +1706,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'users';
         value: string | User;
+      } | null)
+    | ({
+        relationTo: 'payload-sites';
+        value: string | PayloadSite;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2009,47 +2009,6 @@ export interface MediaSelect<T extends boolean = true> {
               filename?: T;
             };
       };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "payload-sites_select".
- */
-export interface PayloadSitesSelect<T extends boolean = true> {
-  name?: T;
-  slug?: T;
-  description?: T;
-  enabled?: T;
-  writeBackEnabled?: T;
-  baseURL?: T;
-  adminURL?: T;
-  apiKeyAuthCollection?: T;
-  apiKeySecretReference?: T;
-  schemaProfileEndpoint?: T;
-  companionPluginStatus?: T;
-  companionPluginLastCheckedAt?: T;
-  companionPluginError?: T;
-  schemaProfileStatus?: T;
-  schemaProfileSyncedAt?: T;
-  schemaProfileHash?: T;
-  schemaProfile?: T;
-  capabilities?: T;
-  allowedCollections?: T;
-  allowedRoles?: T;
-  fieldAllowlists?:
-    | T
-    | {
-        collection?: T;
-        paths?: T;
-        id?: T;
-      };
-  mediaPolicy?:
-    | T
-    | {
-        allowedMimeTypes?: T;
-        maxFileSizeBytes?: T;
-      };
-  updatedAt?: T;
-  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2490,6 +2449,47 @@ export interface UsersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-sites_select".
+ */
+export interface PayloadSitesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  description?: T;
+  enabled?: T;
+  writeBackEnabled?: T;
+  baseURL?: T;
+  adminURL?: T;
+  apiKeyAuthCollection?: T;
+  apiKeySecretReference?: T;
+  schemaProfileEndpoint?: T;
+  companionPluginStatus?: T;
+  companionPluginLastCheckedAt?: T;
+  companionPluginError?: T;
+  schemaProfileStatus?: T;
+  schemaProfileSyncedAt?: T;
+  schemaProfileHash?: T;
+  schemaProfile?: T;
+  capabilities?: T;
+  allowedCollections?: T;
+  allowedRoles?: T;
+  fieldAllowlists?:
+    | T
+    | {
+        collection?: T;
+        paths?: T;
+        id?: T;
+      };
+  mediaPolicy?:
+    | T
+    | {
+        allowedMimeTypes?: T;
+        maxFileSizeBytes?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
