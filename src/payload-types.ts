@@ -84,6 +84,7 @@ export interface Config {
     'agent-sessions': AgentSession;
     'agent-messages': AgentMessage;
     'agent-runs': AgentRun;
+    'remote-draft-audits': RemoteDraftAudit;
     roles: Role;
     users: User;
     'payload-sites': PayloadSite;
@@ -119,6 +120,7 @@ export interface Config {
     'agent-sessions': AgentSessionsSelect<false> | AgentSessionsSelect<true>;
     'agent-messages': AgentMessagesSelect<false> | AgentMessagesSelect<true>;
     'agent-runs': AgentRunsSelect<false> | AgentRunsSelect<true>;
+    'remote-draft-audits': RemoteDraftAuditsSelect<false> | RemoteDraftAuditsSelect<true>;
     roles: RolesSelect<false> | RolesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-sites': PayloadSitesSelect<false> | PayloadSitesSelect<true>;
@@ -542,6 +544,18 @@ export interface Agent {
     | boolean
     | null;
   outputSchema?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Default target binding for CMS draft output. Plan and task bindings can narrow this per run.
+   */
+  outputBinding?:
     | {
         [k: string]: unknown;
       }
@@ -1244,6 +1258,18 @@ export interface AgentPlan {
     | number
     | boolean
     | null;
+  /**
+   * Default CMS draft target binding inherited by cms-draft tasks unless a task overrides it.
+   */
+  outputBinding?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   limits: {
     maxIterations: number;
     maxConcurrentTasks: number;
@@ -1318,6 +1344,18 @@ export interface AgentPlanTask {
     | number
     | boolean
     | null;
+  /**
+   * Explicit CMS draft target binding enforced before remote Payload API writes.
+   */
+  outputBinding?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   successCriteria?:
     | {
         criterion: string;
@@ -1368,6 +1406,8 @@ export interface PayloadSite {
   schemaProfileStatus: 'missing' | 'synced' | 'stale' | 'error';
   schemaProfileSyncedAt?: string | null;
   schemaProfileHash?: string | null;
+  schemaProfileReviewedAt?: string | null;
+  schemaProfileReviewedBy?: (string | null) | User;
   schemaProfile?:
     | {
         [k: string]: unknown;
@@ -1486,6 +1526,74 @@ export interface AgentMessage {
   status: 'pending' | 'streaming' | 'complete' | 'failed';
   providerMessageID?: string | null;
   createdBy?: (string | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "remote-draft-audits".
+ */
+export interface RemoteDraftAudit {
+  id: string;
+  run?: (string | null) | AgentRun;
+  plan?: (string | null) | AgentPlan;
+  planTask?: (string | null) | AgentPlanTask;
+  payloadSite?: (string | null) | PayloadSite;
+  collection?: string | null;
+  operation?: ('create' | 'update') | null;
+  status: 'attempted' | 'succeeded' | 'failed';
+  remoteDocumentID?: string | null;
+  remoteVersionID?: string | null;
+  adminURL?: string | null;
+  previewURL?: string | null;
+  mediaIDs?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  target?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  outputBinding?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  requestDocument?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  response?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  error?: string | null;
+  attemptedAt: string;
+  completedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1698,6 +1806,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'agent-runs';
         value: string | AgentRun;
+      } | null)
+    | ({
+        relationTo: 'remote-draft-audits';
+        value: string | RemoteDraftAudit;
       } | null)
     | ({
         relationTo: 'roles';
@@ -2175,6 +2287,7 @@ export interface AgentsSelect<T extends boolean = true> {
   inputMode?: T;
   inputSchema?: T;
   outputSchema?: T;
+  outputBinding?: T;
   streamingEnabled?: T;
   maxRunsPerMinute?: T;
   maxConcurrentRuns?: T;
@@ -2261,6 +2374,7 @@ export interface AgentPlansSelect<T extends boolean = true> {
   mode?: T;
   submittedInput?: T;
   sharedContext?: T;
+  outputBinding?: T;
   limits?:
     | T
     | {
@@ -2312,6 +2426,7 @@ export interface AgentPlanTasksSelect<T extends boolean = true> {
   errorCode?: T;
   errorMessage?: T;
   expectedOutput?: T;
+  outputBinding?: T;
   successCriteria?:
     | T
     | {
@@ -2415,6 +2530,33 @@ export interface AgentRunsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "remote-draft-audits_select".
+ */
+export interface RemoteDraftAuditsSelect<T extends boolean = true> {
+  run?: T;
+  plan?: T;
+  planTask?: T;
+  payloadSite?: T;
+  collection?: T;
+  operation?: T;
+  status?: T;
+  remoteDocumentID?: T;
+  remoteVersionID?: T;
+  adminURL?: T;
+  previewURL?: T;
+  mediaIDs?: T;
+  target?: T;
+  outputBinding?: T;
+  requestDocument?: T;
+  response?: T;
+  error?: T;
+  attemptedAt?: T;
+  completedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "roles_select".
  */
 export interface RolesSelect<T extends boolean = true> {
@@ -2471,6 +2613,8 @@ export interface PayloadSitesSelect<T extends boolean = true> {
   schemaProfileStatus?: T;
   schemaProfileSyncedAt?: T;
   schemaProfileHash?: T;
+  schemaProfileReviewedAt?: T;
+  schemaProfileReviewedBy?: T;
   schemaProfile?: T;
   capabilities?: T;
   allowedCollections?: T;

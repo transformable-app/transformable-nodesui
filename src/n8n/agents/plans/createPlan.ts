@@ -74,6 +74,7 @@ export const createAgentPlan = async ({ input, req, start = false }: CreateAgent
       limits: validation.plan.limits,
       mode: validation.plan.mode,
       objective: validation.plan.objective,
+      outputBinding: asPayloadJSON(validation.plan.outputBinding),
       sharedContext: asPayloadJSON(validation.redactedPlan.context ?? {}),
       slug: `${toSlug(validation.plan.title)}-${Date.now().toString(36)}`,
       startedAt: start ? now : undefined,
@@ -96,6 +97,7 @@ export const createAgentPlan = async ({ input, req, start = false }: CreateAgent
         data: {
           dependsOn: task.dependsOn.map((dependencyID) => ({ taskID: dependencyID })),
           expectedOutput: asPayloadJSON(task.expectedOutput),
+          outputBinding: asPayloadJSON(task.outputBinding),
           createdBy: req.user.id,
           attempts: 0,
           inputPreview: toPreview(task.input ?? {}, 8000),

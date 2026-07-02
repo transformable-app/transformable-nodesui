@@ -63,6 +63,14 @@ export const AgentPlans: CollectionConfig = {
     { name: 'submittedInput', type: 'json' },
     { name: 'sharedContext', type: 'json' },
     {
+      name: 'outputBinding',
+      type: 'json',
+      admin: {
+        description:
+          'Default CMS draft target binding inherited by cms-draft tasks unless a task overrides it.',
+      },
+    },
+    {
       name: 'limits',
       type: 'group',
       fields: [

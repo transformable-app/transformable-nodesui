@@ -166,6 +166,21 @@ export const PayloadSites: CollectionConfig = {
       },
     },
     {
+      name: 'schemaProfileReviewedAt',
+      type: 'date',
+      admin: {
+        readOnly: true,
+      },
+    },
+    {
+      name: 'schemaProfileReviewedBy',
+      type: 'relationship',
+      relationTo: 'users',
+      admin: {
+        readOnly: true,
+      },
+    },
+    {
       name: 'schemaProfile',
       type: 'json',
       admin: {

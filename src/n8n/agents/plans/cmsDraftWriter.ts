@@ -1,7 +1,7 @@
 import { APIError, type PayloadRequest } from 'payload'
 
 import { uploadMediaDocument, writeDraftDocument } from '@/payloadSites/client'
-import type { AgentArtifact, PayloadSite } from '@/payload-types'
+import type { AgentArtifact, PayloadSite, RemoteDraftAudit } from '@/payload-types'
 
 type CMSDraftTarget = {
   collection: string
@@ -27,6 +27,18 @@ type CMSDraftMediaRequest = {
   sourceURL?: string
   targetCollection?: string
   targetFieldPath: string
+}
+
+type CMSDraftOutputBinding = {
+  allowedBlocks?: string[]
+  allowedFields?: string[]
+  collection: string
+  fieldMappings?: Array<{
+    sourcePath: string
+    targetPath: string
+  }>
+  operation?: 'create' | 'update'
+  payloadSite: string
 }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -184,6 +196,55 @@ const isPathAllowed = (path: string, allowedPaths: string[]) => {
   })
 }
 
+const getStringArray = (value: unknown): string[] | undefined =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+    : undefined
+
+const parseOutputBinding = (value: unknown): CMSDraftOutputBinding | null => {
+  if (!isPlainObject(value)) return null
+
+  const payloadSite = getString(value.payloadSite)
+  const collection = getString(value.collection)
+  const operation = value.operation === 'create' || value.operation === 'update' ? value.operation : undefined
+  const fieldMappings = Array.isArray(value.fieldMappings)
+    ? value.fieldMappings
+        .map((mapping) => {
+          if (!isPlainObject(mapping)) return null
+          const sourcePath = getString(mapping.sourcePath)
+          const targetPath = getString(mapping.targetPath)
+          return sourcePath && targetPath ? { sourcePath, targetPath } : null
+        })
+        .filter((mapping): mapping is { sourcePath: string; targetPath: string } => Boolean(mapping))
+    : undefined
+
+  if (!payloadSite || !collection) return null
+
+  return {
+    allowedBlocks: getStringArray(value.allowedBlocks),
+    allowedFields: getStringArray(value.allowedFields),
+    collection,
+    fieldMappings,
+    operation,
+    payloadSite,
+  }
+}
+
+const assertDraftMatchesBinding = (
+  binding: CMSDraftOutputBinding,
+  draft: CMSDraftOutput,
+): void => {
+  if (draft.target.payloadSite !== binding.payloadSite) {
+    throw new APIError('CMS draft target payloadSite does not match the output binding.', 400)
+  }
+  if (draft.target.collection !== binding.collection) {
+    throw new APIError('CMS draft target collection does not match the output binding.', 400)
+  }
+  if (binding.operation && draft.target.operation !== binding.operation) {
+    throw new APIError('CMS draft target operation does not match the output binding.', 400)
+  }
+}
+
 const validateDraftDocumentAgainstSite = ({
   collection,
   document,
@@ -227,6 +288,45 @@ const validateDraftDocumentAgainstSite = ({
     )
     if (disallowedBlockType) {
       throw new APIError(`Block type "${disallowedBlockType}" is not allowed for this site.`, 400)
+    }
+  }
+}
+
+const validateDraftDocumentAgainstBinding = ({
+  binding,
+  document,
+  mediaRequests,
+}: {
+  binding: CMSDraftOutputBinding
+  document: Record<string, unknown>
+  mediaRequests?: CMSDraftMediaRequest[]
+}) => {
+  if (binding.allowedFields?.length) {
+    const disallowedPath = collectDocumentPaths(document).find(
+      (path) => !isPathAllowed(path, binding.allowedFields ?? []),
+    )
+    if (disallowedPath) {
+      throw new APIError(`Generated document field "${disallowedPath}" is not allowed by output binding.`, 400)
+    }
+
+    const disallowedMediaPath = mediaRequests?.find(
+      (request) => !isPathAllowed(request.targetFieldPath, binding.allowedFields ?? []),
+    )
+    if (disallowedMediaPath) {
+      throw new APIError(
+        `Media target field "${disallowedMediaPath.targetFieldPath}" is not allowed by output binding.`,
+        400,
+      )
+    }
+  }
+
+  if (binding.allowedBlocks?.length) {
+    const allowedBlocks = new Set(binding.allowedBlocks)
+    const disallowedBlockType = collectBlockTypes(document).find(
+      (blockType) => !allowedBlocks.has(blockType),
+    )
+    if (disallowedBlockType) {
+      throw new APIError(`Block type "${disallowedBlockType}" is not allowed by output binding.`, 400)
     }
   }
 }
@@ -510,6 +610,28 @@ const fetchMediaBlob = async ({
   }
 }
 
+const createRemoteDraftAudit = async ({
+  audit,
+  req,
+}: {
+  audit: Partial<RemoteDraftAudit> & {
+    attemptedAt: string
+    status: 'attempted' | 'failed' | 'succeeded'
+  }
+  req: PayloadRequest
+}) => {
+  try {
+    await req.payload.create({
+      collection: 'remote-draft-audits',
+      data: audit as never,
+      overrideAccess: true,
+      req,
+    })
+  } catch {
+    // Audit writes must never mask the remote write result recorded on the run.
+  }
+}
+
 const resolveMediaRequests = async ({
   document,
   mediaRequests,
@@ -549,93 +671,148 @@ const resolveMediaRequests = async ({
 }
 
 export const writeCMSDraftFromTaskOutput = async ({
+  outputBinding,
   output,
   req,
   runID,
 }: {
+  outputBinding?: unknown
   output: unknown
   req: PayloadRequest
   runID: string
 }) => {
   const draft = parseCMSDraftOutput(output)
+  const binding = parseOutputBinding(outputBinding)
+  if (!binding) throw new APIError('CMS draft output binding is required.', 400)
+  assertDraftMatchesBinding(binding, draft)
   const site = await loadPayloadSite({ idOrSlug: draft.target.payloadSite, req })
-  assertSiteCanWrite(site, draft.target.collection)
   const document = { ...draft.document }
-  validateDraftDocumentAgainstSite({
-    collection: draft.target.collection,
-    document,
-    mediaRequests: draft.mediaRequests,
-    site,
-  })
-  const mediaIDs = await resolveMediaRequests({
-    document,
-    mediaRequests: draft.mediaRequests,
-    req,
-    site,
-  })
-
-  const response = await writeDraftDocument({
-    collection: draft.target.collection,
-    data: document,
-    id: draft.target.id,
-    operation: draft.target.operation,
-    site,
-  })
-
-  const remoteDocumentID = getRemoteID(response)
-  const remoteVersionID =
-    getString(response.versionID) ??
-    (isPlainObject(response.version) ? getString(response.version.id) : undefined)
-
   const payloadSiteID = String(site.id)
-  const adminURL =
-    resolveURLTemplate({
+  const attemptedAt = new Date().toISOString()
+
+  try {
+    assertSiteCanWrite(site, draft.target.collection)
+    validateDraftDocumentAgainstBinding({
+      binding,
+      document,
+      mediaRequests: draft.mediaRequests,
+    })
+    validateDraftDocumentAgainstSite({
+      collection: draft.target.collection,
+      document,
+      mediaRequests: draft.mediaRequests,
+      site,
+    })
+    const mediaIDs = await resolveMediaRequests({
+      document,
+      mediaRequests: draft.mediaRequests,
+      req,
+      site,
+    })
+
+    const response = await writeDraftDocument({
+      collection: draft.target.collection,
+      data: document,
+      id: draft.target.id,
+      operation: draft.target.operation,
+      site,
+    })
+
+    const remoteDocumentID = getRemoteID(response)
+    const remoteVersionID =
+      getString(response.versionID) ??
+      (isPlainObject(response.version) ? getString(response.version.id) : undefined)
+
+    const adminURL =
+      resolveURLTemplate({
+        collection: draft.target.collection,
+        documentID: remoteDocumentID,
+        locale: draft.target.locale,
+        site,
+        template: getURLTemplate(site, 'admin'),
+        tenant: draft.target.tenant,
+        versionID: remoteVersionID,
+      }) ||
+      site.adminURL ||
+      undefined
+    const previewURL = resolveURLTemplate({
       collection: draft.target.collection,
       documentID: remoteDocumentID,
       locale: draft.target.locale,
       site,
-      template: getURLTemplate(site, 'admin'),
+      template: getURLTemplate(site, 'preview'),
       tenant: draft.target.tenant,
       versionID: remoteVersionID,
-    }) ||
-    site.adminURL ||
-    undefined
-  const previewURL = resolveURLTemplate({
-    collection: draft.target.collection,
-    documentID: remoteDocumentID,
-    locale: draft.target.locale,
-    site,
-    template: getURLTemplate(site, 'preview'),
-    tenant: draft.target.tenant,
-    versionID: remoteVersionID,
-  })
-  const remoteDraft = {
-    adminURL,
-    collection: draft.target.collection,
-    documentID: remoteDocumentID,
-    lastSyncedAt: new Date().toISOString(),
-    locale: draft.target.locale,
-    mediaIDs,
-    operation: draft.target.operation,
-    payloadSite: payloadSiteID,
-    previewURL,
-    response,
-    status: 'created' as const,
-    tenant: draft.target.tenant,
-    versionID: remoteVersionID,
+    })
+    const remoteDraft = {
+      adminURL,
+      collection: draft.target.collection,
+      documentID: remoteDocumentID,
+      lastSyncedAt: new Date().toISOString(),
+      locale: draft.target.locale,
+      mediaIDs,
+      operation: draft.target.operation,
+      payloadSite: payloadSiteID,
+      previewURL,
+      response,
+      status: 'created' as const,
+      tenant: draft.target.tenant,
+      versionID: remoteVersionID,
+    }
+
+    await req.payload.update({
+      collection: 'agent-runs',
+      data: {
+        remoteDraft,
+      },
+      id: runID,
+      overrideAccess: true,
+      req,
+    })
+
+    await createRemoteDraftAudit({
+      audit: {
+        adminURL,
+        attemptedAt,
+        collection: draft.target.collection,
+        completedAt: new Date().toISOString(),
+        mediaIDs,
+        operation: draft.target.operation,
+        outputBinding: binding,
+        payloadSite: payloadSiteID,
+        previewURL,
+        remoteDocumentID,
+        remoteVersionID,
+        requestDocument: document,
+        response,
+        run: runID,
+        status: 'succeeded',
+        target: draft.target,
+      },
+      req,
+    })
+
+    return remoteDraft
+  } catch (error) {
+    await createRemoteDraftAudit({
+      audit: {
+        attemptedAt,
+        collection: draft.target.collection,
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'CMS draft write failed.',
+        operation: draft.target.operation,
+        outputBinding: binding,
+        payloadSite: payloadSiteID,
+        requestDocument: document,
+        run: runID,
+        status: 'failed',
+        target: draft.target,
+      },
+      req,
+    })
+
+    throw error
   }
-
-  await req.payload.update({
-    collection: 'agent-runs',
-    data: {
-      remoteDraft,
-    },
-    id: runID,
-    overrideAccess: true,
-    req,
-  })
-
-  return remoteDraft
 }
 
 export const recordCMSDraftWriteFailure = async ({

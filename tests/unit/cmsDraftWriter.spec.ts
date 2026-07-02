@@ -62,6 +62,7 @@ const makeReq = (site: PayloadSite) => {
         updates.push(args)
         return args.data
       }),
+      create: vi.fn(async (args: Record<string, unknown>) => args.data),
     },
     updates,
   }
@@ -82,6 +83,18 @@ const output = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
+const outputBinding = {
+  allowedBlocks: ['content'],
+  allowedFields: ['title', 'hero', 'hero.image', 'layout', 'layout.*', 'layout.*.blockType', 'layout.*.heading'],
+  collection: 'pages',
+  payloadSite: 'primary',
+}
+
+const targetOnlyOutputBinding = {
+  collection: 'pages',
+  payloadSite: 'primary',
+}
+
 describe('cms-draft remote writer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -101,6 +114,7 @@ describe('cms-draft remote writer', () => {
     const req = makeReq(makeSite())
 
     const remoteDraft = await writeCMSDraftFromTaskOutput({
+      outputBinding,
       output: output(),
       req: req as never,
       runID: 'run-1',
@@ -129,6 +143,18 @@ describe('cms-draft remote writer', () => {
         id: 'run-1',
       }),
     )
+    expect(req.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'remote-draft-audits',
+        data: expect.objectContaining({
+          collection: 'pages',
+          payloadSite: 'site-1',
+          remoteDocumentID: 'remote-doc-1',
+          run: 'run-1',
+          status: 'succeeded',
+        }),
+      }),
+    )
   })
 
   it('fetches allowed media URLs, uploads media, and writes the uploaded media id into the document', async () => {
@@ -142,6 +168,7 @@ describe('cms-draft remote writer', () => {
     )
 
     await writeCMSDraftFromTaskOutput({
+      outputBinding,
       output: output({
         document: {
           hero: {},
@@ -184,6 +211,7 @@ describe('cms-draft remote writer', () => {
 
     await expect(
       writeCMSDraftFromTaskOutput({
+        outputBinding: targetOnlyOutputBinding,
         output: output({
           document: {
             hero: {},
@@ -207,6 +235,17 @@ describe('cms-draft remote writer', () => {
 
     expect(mockedUploadMediaDocument).not.toHaveBeenCalled()
     expect(mockedWriteDraftDocument).not.toHaveBeenCalled()
+    expect(req.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'remote-draft-audits',
+        data: expect.objectContaining({
+          error: 'Media source URL must use HTTP or HTTPS.',
+          payloadSite: 'site-1',
+          run: 'run-1',
+          status: 'failed',
+        }),
+      }),
+    )
   })
 
   it('rejects generated fields outside the site field allowlist', async () => {
@@ -214,6 +253,7 @@ describe('cms-draft remote writer', () => {
 
     await expect(
       writeCMSDraftFromTaskOutput({
+        outputBinding: targetOnlyOutputBinding,
         output: output({
           document: {
             layout: [{ blockType: 'content', heading: 'Draft heading' }],
@@ -234,6 +274,7 @@ describe('cms-draft remote writer', () => {
 
     await expect(
       writeCMSDraftFromTaskOutput({
+        outputBinding: targetOnlyOutputBinding,
         output: output({
           document: {
             layout: [{ blockType: 'hero', heading: 'Blocked' }],
@@ -244,6 +285,29 @@ describe('cms-draft remote writer', () => {
         runID: 'run-1',
       }),
     ).rejects.toThrow('Block type "hero" is not allowed for this site.')
+
+    expect(mockedWriteDraftDocument).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing or mismatched cms-draft output bindings before remote writes', async () => {
+    const req = makeReq(makeSite())
+
+    await expect(
+      writeCMSDraftFromTaskOutput({
+        output: output(),
+        req: req as never,
+        runID: 'run-1',
+      }),
+    ).rejects.toThrow('CMS draft output binding is required.')
+
+    await expect(
+      writeCMSDraftFromTaskOutput({
+        outputBinding: { collection: 'posts', payloadSite: 'primary' },
+        output: output(),
+        req: req as never,
+        runID: 'run-1',
+      }),
+    ).rejects.toThrow('CMS draft target collection does not match the output binding.')
 
     expect(mockedWriteDraftDocument).not.toHaveBeenCalled()
   })

@@ -97,6 +97,7 @@ export const finalizePlanTask = async ({
   if (status === 'succeeded' && getExpectedOutputType(existingTask.expectedOutput) === 'cms-draft') {
     try {
       await writeCMSDraftFromTaskOutput({
+        outputBinding: existingTask.outputBinding,
         output: outputValue,
         req,
         runID,
@@ -198,6 +199,7 @@ export const finalizePlanTaskFromRun = async ({
   ) {
     try {
       await writeCMSDraftFromTaskOutput({
+        outputBinding: existingTask.outputBinding,
         output: outputValue,
         req: req as PayloadRequest,
         runID: run.id,

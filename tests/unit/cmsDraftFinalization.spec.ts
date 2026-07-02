@@ -23,6 +23,7 @@ const makeReq = () => ({
     findByID: vi.fn(async () => ({
       expectedOutput: { type: 'cms-draft' },
       id: 'task-1',
+      outputBinding: { collection: 'pages', payloadSite: 'primary' },
       plan: 'plan-1',
     })),
     update: vi.fn(async (args: Record<string, unknown>) => ({
@@ -56,6 +57,7 @@ describe('cms-draft finalization', () => {
     })
 
     expect(mockedWriteCMSDraftFromTaskOutput).toHaveBeenCalledWith({
+      outputBinding: { collection: 'pages', payloadSite: 'primary' },
       output: response.data,
       req,
       runID: 'run-1',

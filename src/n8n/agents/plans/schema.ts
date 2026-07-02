@@ -26,6 +26,18 @@ export type AgentPlanApprovalPolicy = {
   requireOnRisk?: boolean
 }
 
+export type AgentPlanOutputBinding = {
+  allowedBlocks?: string[]
+  allowedFields?: string[]
+  collection: string
+  fieldMappings?: Array<{
+    sourcePath: string
+    targetPath: string
+  }>
+  operation?: 'create' | 'update'
+  payloadSite: string
+}
+
 export type AgentPlanTaskInput = {
   dependsOn?: string[]
   expectedOutput?: {
@@ -35,6 +47,7 @@ export type AgentPlanTaskInput = {
   id: string
   input?: Record<string, unknown>
   instructions: string
+  outputBinding?: AgentPlanOutputBinding
   requiresApproval?: boolean
   riskLevel?: AgentPlanTaskRiskLevel
   successCriteria?: string[]
@@ -48,6 +61,7 @@ export type AgentPlanInput = {
   limits?: AgentPlanLimitsInput
   mode: AgentPlanMode
   objective: string
+  outputBinding?: AgentPlanOutputBinding
   tasks: AgentPlanTaskInput[]
   title: string
 }
@@ -113,6 +127,7 @@ export const AGENT_PLAN_INPUT_JSON_SCHEMA = {
     },
     mode: { enum: AGENT_PLAN_MODES, type: 'string' },
     objective: { minLength: 1, type: 'string' },
+    outputBinding: { type: 'object' },
     tasks: {
       items: {
         additionalProperties: false,
@@ -130,6 +145,7 @@ export const AGENT_PLAN_INPUT_JSON_SCHEMA = {
           id: { minLength: 1, type: 'string' },
           input: { type: 'object' },
           instructions: { minLength: 1, type: 'string' },
+          outputBinding: { type: 'object' },
           requiresApproval: { type: 'boolean' },
           riskLevel: { enum: AGENT_PLAN_TASK_RISK_LEVELS, type: 'string' },
           successCriteria: { items: { type: 'string' }, type: 'array' },

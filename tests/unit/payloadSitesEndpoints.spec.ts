@@ -15,7 +15,10 @@ const getEndpoint = (path: string) => {
   return endpoint
 }
 
-const makeReq = (site: Record<string, unknown>, user: Record<string, unknown> | null = { roles: ['Admin'] }) => ({
+const makeReq = (
+  site: Record<string, unknown>,
+  user: Record<string, unknown> | null = { id: 'user-1', roles: ['Admin'] },
+) => ({
   payload: {
     findByID: vi.fn(async () => site),
     update: vi.fn(async (args: Record<string, unknown>) => ({ id: site.id, ...(args.data as object) })),
@@ -100,6 +103,37 @@ describe('payload-sites endpoints', () => {
           schemaProfileStatus: 'stale',
           writeBackEnabled: false,
         }),
+      }),
+    )
+  })
+
+  it('accepts a stale schema profile and records reviewer metadata', async () => {
+    const site = {
+      id: 'site-1',
+      schemaProfileHash: 'new-hash',
+      schemaProfileStatus: 'stale',
+      writeBackEnabled: false,
+    }
+    const req = makeReq(site)
+
+    const response = await getEndpoint('/:id/accept-schema-profile').handler(req as never)
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.schemaProfileStatus).toBe('synced')
+    expect(req.payload.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'payload-sites',
+        data: expect.objectContaining({
+          schemaProfileReviewedBy: 'user-1',
+          schemaProfileStatus: 'synced',
+        }),
+        id: 'site-1',
+      }),
+    )
+    expect(req.payload.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ writeBackEnabled: true }),
       }),
     )
   })

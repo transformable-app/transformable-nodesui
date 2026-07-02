@@ -9,6 +9,7 @@ import {
   AGENT_PLAN_TASK_RISK_LEVELS,
   type AgentPlanInput,
   type AgentPlanMode,
+  type AgentPlanOutputBinding,
   type AgentPlanTaskInput,
   type AgentPlanTaskOutputType,
   type AgentPlanTaskRiskLevel,
@@ -37,6 +38,76 @@ const isRiskLevel = (value: unknown): value is AgentPlanTaskRiskLevel =>
 
 const cleanString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value.trim() : null
+
+const cleanStringArray = (value: unknown): string[] | undefined =>
+  Array.isArray(value)
+    ? value.map(cleanString).filter((item): item is string => Boolean(item))
+    : undefined
+
+const normalizeOutputBinding = ({
+  errors,
+  label,
+  value,
+}: {
+  errors: string[]
+  label: string
+  value: unknown
+}): AgentPlanOutputBinding | undefined => {
+  if (value === undefined) return undefined
+  if (!isPlainObject(value)) {
+    errors.push(`${label} must be an object.`)
+    return undefined
+  }
+
+  const payloadSite = cleanString(value.payloadSite)
+  const collection = cleanString(value.collection)
+  const operation =
+    value.operation === undefined
+      ? undefined
+      : value.operation === 'create' || value.operation === 'update'
+        ? value.operation
+        : null
+
+  if (!payloadSite) errors.push(`${label}.payloadSite is required.`)
+  if (!collection) errors.push(`${label}.collection is required.`)
+  if (operation === null) errors.push(`${label}.operation must be create or update when present.`)
+  if (value.allowedFields !== undefined && !Array.isArray(value.allowedFields)) {
+    errors.push(`${label}.allowedFields must be an array.`)
+  }
+  if (value.allowedBlocks !== undefined && !Array.isArray(value.allowedBlocks)) {
+    errors.push(`${label}.allowedBlocks must be an array.`)
+  }
+  if (value.fieldMappings !== undefined && !Array.isArray(value.fieldMappings)) {
+    errors.push(`${label}.fieldMappings must be an array.`)
+  }
+
+  const fieldMappings = Array.isArray(value.fieldMappings)
+    ? value.fieldMappings
+        .map((mapping, index) => {
+          if (!isPlainObject(mapping)) {
+            errors.push(`${label}.fieldMappings[${index}] must be an object.`)
+            return null
+          }
+          const sourcePath = cleanString(mapping.sourcePath)
+          const targetPath = cleanString(mapping.targetPath)
+          if (!sourcePath) errors.push(`${label}.fieldMappings[${index}].sourcePath is required.`)
+          if (!targetPath) errors.push(`${label}.fieldMappings[${index}].targetPath is required.`)
+          return sourcePath && targetPath ? { sourcePath, targetPath } : null
+        })
+        .filter((mapping): mapping is { sourcePath: string; targetPath: string } => Boolean(mapping))
+    : undefined
+
+  if (!payloadSite || !collection || operation === null) return undefined
+
+  return {
+    allowedBlocks: cleanStringArray(value.allowedBlocks),
+    allowedFields: cleanStringArray(value.allowedFields),
+    collection,
+    fieldMappings,
+    operation,
+    payloadSite,
+  }
+}
 
 const normalizeIntegerLimit = ({
   cap,
@@ -92,11 +163,7 @@ const normalizeTask = ({
   if (!title) errors.push(`tasks[${taskIndex}].title is required.`)
   if (!instructions) errors.push(`tasks[${taskIndex}].instructions is required.`)
 
-  const dependsOn = Array.isArray(rawTask.dependsOn)
-    ? rawTask.dependsOn
-        .map(cleanString)
-        .filter((dependencyID): dependencyID is string => Boolean(dependencyID))
-    : undefined
+  const dependsOn = cleanStringArray(rawTask.dependsOn)
 
   if (rawTask.dependsOn !== undefined && !Array.isArray(rawTask.dependsOn)) {
     errors.push(`tasks[${taskIndex}].dependsOn must be an array.`)
@@ -142,6 +209,12 @@ const normalizeTask = ({
         : null
   if (riskLevel === null) errors.push(`tasks[${taskIndex}].riskLevel is invalid.`)
 
+  const outputBinding = normalizeOutputBinding({
+    errors,
+    label: `tasks[${taskIndex}].outputBinding`,
+    value: rawTask.outputBinding,
+  })
+
   if (!id || !title || !instructions) return null
 
   return {
@@ -150,6 +223,7 @@ const normalizeTask = ({
     id,
     input: isPlainObject(input) ? input : undefined,
     instructions,
+    outputBinding,
     requiresApproval:
       typeof rawTask.requiresApproval === 'boolean' ? rawTask.requiresApproval : undefined,
     riskLevel: riskLevel ?? undefined,
@@ -236,6 +310,18 @@ export const validateAgentPlanInput = (input: unknown): AgentPlanValidationResul
 
   addDependencyErrors(tasks, errors)
 
+  const outputBinding = normalizeOutputBinding({
+    errors,
+    label: 'outputBinding',
+    value: input.outputBinding,
+  })
+
+  for (const [index, task] of tasks.entries()) {
+    if (task.expectedOutput?.type === 'cms-draft' && !task.outputBinding && !outputBinding) {
+      errors.push(`tasks[${index}].outputBinding is required for cms-draft output.`)
+    }
+  }
+
   const limits = isPlainObject(input.limits) ? input.limits : {}
   if (input.limits !== undefined && !isPlainObject(input.limits)) errors.push('limits must be an object.')
 
@@ -297,10 +383,12 @@ export const validateAgentPlanInput = (input: unknown): AgentPlanValidationResul
     limits: normalizedLimits,
     mode,
     objective,
+    outputBinding,
     tasks: tasks.map((task) => ({
       ...task,
       dependsOn: task.dependsOn ?? [],
       maxAttempts: normalizedLimits.maxTaskAttempts,
+      outputBinding: task.outputBinding ?? outputBinding,
       requiresApproval:
         task.requiresApproval === true ||
         (approvalPolicy.requireOnRisk && task.riskLevel === 'high') ||

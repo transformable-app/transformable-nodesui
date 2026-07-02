@@ -92,6 +92,14 @@ Each collection profile includes:
 
 NodesUI stores the profile on `payload-sites`, computes a hash, and blocks write-back when the companion plugin is missing, incompatible, failing, or the schema profile is stale.
 
+When a sync returns a different hash than the previously reviewed profile, NodesUI marks the site `schemaProfileStatus: stale` and disables write-back. An Admin must review the saved profile and call:
+
+```txt
+POST /api/payload-sites/:id/accept-schema-profile
+```
+
+This records `schemaProfileReviewedAt` and `schemaProfileReviewedBy`, then returns the profile to `synced`. Write-back remains disabled until an Admin explicitly re-enables it on the Payload Site.
+
 ## NodesUI Setup
 
 In NodesUI Admin:
@@ -104,3 +112,40 @@ In NodesUI Admin:
 6. Enable write-back only after review.
 
 Generated drafts are always written through the target site's Payload API, never through NodesUI's Local API.
+
+## CMS Draft Output
+
+Every `cms-draft` plan task must include an explicit `outputBinding`, either on the plan or on the task:
+
+```json
+{
+  "outputBinding": {
+    "payloadSite": "primary-site",
+    "collection": "pages",
+    "operation": "create",
+    "allowedFields": ["title", "layout", "layout.*"],
+    "allowedBlocks": ["hero", "content"]
+  }
+}
+```
+
+The generated task output must still include its own target envelope:
+
+```json
+{
+  "target": {
+    "payloadSite": "primary-site",
+    "collection": "pages",
+    "operation": "create"
+  },
+  "document": {
+    "title": "Draft page",
+    "layout": []
+  },
+  "mediaRequests": []
+}
+```
+
+NodesUI rejects the write if the output target does not match the binding, if the document violates binding/site field or block allowlists, or if media requests point at disallowed URLs or MIME types.
+
+Each known-site remote write attempt also appends a `remote-draft-audits` record with the run, target site, target envelope, binding, request document, result or error, and review URLs when available. Audit records are Admin-readable and append-only.

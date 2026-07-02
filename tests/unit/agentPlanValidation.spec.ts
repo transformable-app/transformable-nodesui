@@ -85,4 +85,54 @@ describe('agent plan validation', () => {
     expect(result.errors).toContain('limits.maxIterations must be less than or equal to 100.')
     expect(result.errors).toContain('limits.maxTaskAttempts must be less than or equal to 5.')
   })
+
+  it('requires and normalizes output binding for cms-draft tasks', () => {
+    const missing = validateAgentPlanInput({
+      ...validPlan,
+      tasks: [
+        {
+          expectedOutput: { type: 'cms-draft' },
+          id: 'draft',
+          instructions: 'Draft CMS content',
+          title: 'Draft',
+        },
+      ],
+    })
+
+    expect(missing.ok).toBe(false)
+    if (!missing.ok) {
+      expect(missing.errors).toContain('tasks[0].outputBinding is required for cms-draft output.')
+    }
+
+    const valid = validateAgentPlanInput({
+      ...validPlan,
+      outputBinding: {
+        allowedBlocks: ['content'],
+        allowedFields: ['title', 'layout'],
+        collection: 'pages',
+        fieldMappings: [{ sourcePath: 'draft.title', targetPath: 'title' }],
+        payloadSite: 'primary',
+      },
+      tasks: [
+        {
+          expectedOutput: { type: 'cms-draft' },
+          id: 'draft',
+          instructions: 'Draft CMS content',
+          title: 'Draft',
+        },
+      ],
+    })
+
+    expect(valid.ok).toBe(true)
+    if (valid.ok) {
+      expect(valid.plan.tasks[0].outputBinding).toEqual(
+        expect.objectContaining({
+          allowedBlocks: ['content'],
+          allowedFields: ['title', 'layout'],
+          collection: 'pages',
+          payloadSite: 'primary',
+        }),
+      )
+    }
+  })
 })

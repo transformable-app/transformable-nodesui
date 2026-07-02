@@ -120,4 +120,34 @@ export const payloadSiteCollectionEndpoints: Endpoint[] = [
       })
     },
   },
+  {
+    path: '/:id/accept-schema-profile',
+    method: 'post',
+    handler: async (req) => {
+      requireAdmin(req)
+      const site = await getSite(req)
+
+      if (site.schemaProfileStatus !== 'stale') {
+        throw new APIError('Only stale schema profiles can be accepted.', 400)
+      }
+
+      const updatedSite = await req.payload.update({
+        collection: 'payload-sites',
+        data: {
+          schemaProfileReviewedAt: new Date().toISOString(),
+          schemaProfileReviewedBy: req.user?.id,
+          schemaProfileStatus: 'synced',
+        },
+        id: site.id,
+        overrideAccess: true,
+        req,
+      })
+
+      return Response.json({
+        ok: true,
+        payloadSite: updatedSite,
+        schemaProfileStatus: 'synced',
+      })
+    },
+  },
 ]

@@ -20,6 +20,7 @@ import { AgentSessions } from './collections/AgentSessions'
 import { Media } from './collections/Media'
 import { Pages } from './collections/Pages'
 import { PayloadSites } from './collections/PayloadSites'
+import { RemoteDraftAudits } from './collections/RemoteDraftAudits'
 import { Roles } from './collections/Roles'
 import { Servers } from './collections/Servers'
 import { Users } from './collections/Users'
@@ -125,6 +126,7 @@ export default buildConfig({
     AgentSessions,
     AgentMessages,
     AgentRuns,
+    RemoteDraftAudits,
     Roles,
     Users,
     PayloadSites,

@@ -67,6 +67,14 @@ export const AgentPlanTasks: CollectionConfig = {
     { name: 'errorMessage', type: 'textarea' },
     { name: 'expectedOutput', type: 'json' },
     {
+      name: 'outputBinding',
+      type: 'json',
+      admin: {
+        description:
+          'Explicit CMS draft target binding enforced before remote Payload API writes.',
+      },
+    },
+    {
       name: 'successCriteria',
       type: 'array',
       fields: [{ name: 'criterion', type: 'textarea', required: true }],

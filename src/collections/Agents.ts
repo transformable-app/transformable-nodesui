@@ -168,6 +168,14 @@ export const Agents: CollectionConfig = {
       type: 'json',
     },
     {
+      name: 'outputBinding',
+      type: 'json',
+      admin: {
+        description:
+          'Default target binding for CMS draft output. Plan and task bindings can narrow this per run.',
+      },
+    },
+    {
       name: 'streamingEnabled',
       type: 'checkbox',
       defaultValue: false,
