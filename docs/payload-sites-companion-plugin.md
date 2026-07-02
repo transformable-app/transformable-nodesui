@@ -45,6 +45,19 @@ Authorization: users API-Key <target-site-api-key>
 
 The endpoint returns generation-safe metadata only. It must not expose secrets, access-control functions, server config, or private runtime values.
 
+The profile may include review URL templates:
+
+```json
+{
+  "urlTemplates": {
+    "admin": "/admin/collections/{collection}/{id}?version={versionID}",
+    "preview": "/preview/{collection}/{id}?locale={locale}&tenant={tenant}"
+  }
+}
+```
+
+NodesUI resolves these templates after a remote draft write and stores the resulting links on `agent-runs.remoteDraft.adminURL` and `agent-runs.remoteDraft.previewURL`. Supported tokens are `{collection}`, `{id}`, `{versionID}`, `{locale}`, and `{tenant}`. If no `admin` template is present, NodesUI falls back to the Payload Site `Admin URL`.
+
 ## Profile Shape
 
 The response is wrapped as:

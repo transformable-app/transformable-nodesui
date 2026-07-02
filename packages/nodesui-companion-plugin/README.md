@@ -51,12 +51,17 @@ The endpoint returns generation-safe metadata only. It does not expose secrets, 
 type NodesUICompanionPluginOptions = {
   endpointPath?: string
   pluginVersion?: string
+  urlTemplates?: {
+    admin?: string
+    preview?: string
+  }
   writableCollections?: string[]
 }
 ```
 
 - `endpointPath` defaults to `/nodesui/schema-profile`.
 - `pluginVersion` defaults to the package version.
+- `urlTemplates.admin` and `urlTemplates.preview` can use `{collection}`, `{id}`, `{versionID}`, `{locale}`, and `{tenant}` tokens.
 - `writableCollections` defaults to `['pages', 'media']`.
 
 ## Development

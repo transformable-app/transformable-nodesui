@@ -37,6 +37,19 @@ export const validateSchemaProfile = (profile: unknown): SchemaProfileValidation
     errors.push('Schema profile collections must be an array.')
   }
 
+  if (profile.urlTemplates !== undefined) {
+    if (!isPlainObject(profile.urlTemplates)) {
+      errors.push('Schema profile urlTemplates must be an object when present.')
+    } else {
+      for (const key of ['admin', 'preview']) {
+        const value = profile.urlTemplates[key]
+        if (value !== undefined && typeof value !== 'string') {
+          errors.push(`Schema profile urlTemplates.${key} must be a string when present.`)
+        }
+      }
+    }
+  }
+
   if (profile.collections && Array.isArray(profile.collections)) {
     for (const [index, collection] of profile.collections.entries()) {
       if (!isPlainObject(collection)) {

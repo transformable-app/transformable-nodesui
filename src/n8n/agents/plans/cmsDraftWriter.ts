@@ -95,6 +95,58 @@ const getAllowedBlockSlugs = (collectionSchema: Record<string, unknown> | null) 
   return slugs.length > 0 ? new Set(slugs) : null
 }
 
+const getURLTemplate = (site: PayloadSite, key: 'admin' | 'preview') => {
+  const profile = site.schemaProfile
+  if (!isPlainObject(profile) || !isPlainObject(profile.urlTemplates)) return undefined
+
+  return getString(profile.urlTemplates[key])
+}
+
+const encodeURLToken = (value: string | undefined) => encodeURIComponent(value ?? '')
+
+const resolveURLTemplate = ({
+  collection,
+  documentID,
+  locale,
+  site,
+  template,
+  tenant,
+  versionID,
+}: {
+  collection: string
+  documentID?: string
+  locale?: string
+  site: PayloadSite
+  template?: string
+  tenant?: string
+  versionID?: string
+}) => {
+  if (!template) return undefined
+
+  const path = template.replace(/\{(collection|id|versionID|locale|tenant)\}/g, (_, token: string) => {
+    switch (token) {
+      case 'collection':
+        return encodeURLToken(collection)
+      case 'id':
+        return encodeURLToken(documentID)
+      case 'versionID':
+        return encodeURLToken(versionID)
+      case 'locale':
+        return encodeURLToken(locale)
+      case 'tenant':
+        return encodeURLToken(tenant)
+      default:
+        return ''
+    }
+  })
+
+  try {
+    return new URL(path, site.baseURL || undefined).toString()
+  } catch {
+    return undefined
+  }
+}
+
 const collectBlockTypes = (value: unknown): string[] => {
   const blockTypes: string[] = []
   if (Array.isArray(value)) {
@@ -536,8 +588,29 @@ export const writeCMSDraftFromTaskOutput = async ({
     (isPlainObject(response.version) ? getString(response.version.id) : undefined)
 
   const payloadSiteID = String(site.id)
+  const adminURL =
+    resolveURLTemplate({
+      collection: draft.target.collection,
+      documentID: remoteDocumentID,
+      locale: draft.target.locale,
+      site,
+      template: getURLTemplate(site, 'admin'),
+      tenant: draft.target.tenant,
+      versionID: remoteVersionID,
+    }) ||
+    site.adminURL ||
+    undefined
+  const previewURL = resolveURLTemplate({
+    collection: draft.target.collection,
+    documentID: remoteDocumentID,
+    locale: draft.target.locale,
+    site,
+    template: getURLTemplate(site, 'preview'),
+    tenant: draft.target.tenant,
+    versionID: remoteVersionID,
+  })
   const remoteDraft = {
-    adminURL: site.adminURL || undefined,
+    adminURL,
     collection: draft.target.collection,
     documentID: remoteDocumentID,
     lastSyncedAt: new Date().toISOString(),
@@ -545,6 +618,7 @@ export const writeCMSDraftFromTaskOutput = async ({
     mediaIDs,
     operation: draft.target.operation,
     payloadSite: payloadSiteID,
+    previewURL,
     response,
     status: 'created' as const,
     tenant: draft.target.tenant,

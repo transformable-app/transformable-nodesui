@@ -159,6 +159,7 @@ const buildSchemaProfile = (config: Config, options: Required<NodesUICompanionPl
       name: 'nodesui-companion',
       version: options.pluginVersion,
     },
+    urlTemplates: options.urlTemplates,
   }
 }
 
@@ -168,6 +169,7 @@ export const nodesUICompanionPlugin =
     const options: Required<NodesUICompanionPluginOptions> = {
       endpointPath: pluginOptions.endpointPath || DEFAULT_ENDPOINT_PATH,
       pluginVersion: pluginOptions.pluginVersion || DEFAULT_PLUGIN_VERSION,
+      urlTemplates: pluginOptions.urlTemplates || {},
       writableCollections: pluginOptions.writableCollections || ['pages', 'media'],
     }
 
