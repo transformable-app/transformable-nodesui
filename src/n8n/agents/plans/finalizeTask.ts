@@ -3,6 +3,11 @@ import type { PayloadRequest } from 'payload'
 import { redactValue, toPreview } from '@/n8n/agents/redact'
 import type { AgentInvokeResult } from '@/n8n/agents/types'
 
+import {
+  getExpectedOutputType,
+  recordCMSDraftWriteFailure,
+  writeCMSDraftFromTaskOutput,
+} from './cmsDraftWriter'
 import { isPlanTerminal, type RunnablePlanTask } from './selectRunnableTasks'
 
 const asPayloadJSON = (value: unknown) =>
@@ -80,16 +85,43 @@ export const finalizePlanTask = async ({
   const finishedAt = new Date().toISOString()
   const status = getTaskStatusForResponse(response)
   const outputValue = response.data ?? response.content
+  const existingTask = await req.payload.findByID({
+    collection: 'agent-plan-tasks',
+    depth: 0,
+    id: taskID,
+    overrideAccess: true,
+    req,
+  })
+  let cmsDraftError: string | undefined
+
+  if (status === 'succeeded' && getExpectedOutputType(existingTask.expectedOutput) === 'cms-draft') {
+    try {
+      await writeCMSDraftFromTaskOutput({
+        output: outputValue,
+        req,
+        runID,
+      })
+    } catch (error) {
+      cmsDraftError = error instanceof Error ? error.message : 'CMS draft write failed.'
+      await recordCMSDraftWriteFailure({
+        error: cmsDraftError,
+        req,
+        runID,
+      })
+    }
+  }
+
+  const finalStatus = cmsDraftError ? 'failed' : status
   const task = await req.payload.update({
     collection: 'agent-plan-tasks',
     data: {
-      errorCode: response.status === 'failed' ? 'workflow-error' : undefined,
-      errorMessage: response.status === 'failed' ? response.content : undefined,
-      finishedAt: status === 'succeeded' || status === 'failed' ? finishedAt : undefined,
+      errorCode: cmsDraftError ? 'workflow-error' : response.status === 'failed' ? 'workflow-error' : undefined,
+      errorMessage: cmsDraftError ?? (response.status === 'failed' ? response.content : undefined),
+      finishedAt: finalStatus === 'succeeded' || finalStatus === 'failed' ? finishedAt : undefined,
       latestRun: runID,
       outputPreview: toPreview(outputValue, 8000),
       outputSummary: asPayloadJSON(redactValue(response.data ?? { content: response.content })),
-      status,
+      status: finalStatus,
     },
     id: taskID,
     overrideAccess: true,
@@ -150,20 +182,49 @@ export const finalizePlanTaskFromRun = async ({
 }) => {
   const taskID = getRelationshipID(run.planTask)
   if (!taskID) return null
+  const existingTask = await req.payload.findByID({
+    collection: 'agent-plan-tasks',
+    depth: 0,
+    id: taskID,
+    overrideAccess: true,
+  })
+
+  const outputValue = response.data ?? response.content
+  let cmsDraftError: string | undefined
+
+  if (
+    response.status === 'succeeded' &&
+    getExpectedOutputType(existingTask.expectedOutput) === 'cms-draft'
+  ) {
+    try {
+      await writeCMSDraftFromTaskOutput({
+        output: outputValue,
+        req: req as PayloadRequest,
+        runID: run.id,
+      })
+    } catch (error) {
+      cmsDraftError = error instanceof Error ? error.message : 'CMS draft write failed.'
+      await recordCMSDraftWriteFailure({
+        error: cmsDraftError,
+        req: req as PayloadRequest,
+        runID: run.id,
+      })
+    }
+  }
+
+  const status = cmsDraftError ? 'failed' : getTaskStatusForResponse(response)
 
   const task = await req.payload.update({
     collection: 'agent-plan-tasks',
     data: {
-      errorCode: response.status === 'failed' ? 'workflow-error' : undefined,
-      errorMessage: response.status === 'failed' ? response.content : undefined,
+      errorCode: cmsDraftError ? 'workflow-error' : response.status === 'failed' ? 'workflow-error' : undefined,
+      errorMessage: cmsDraftError ?? (response.status === 'failed' ? response.content : undefined),
       finishedAt:
-        response.status === 'succeeded' || response.status === 'failed'
-          ? new Date().toISOString()
-          : undefined,
+        status === 'succeeded' || status === 'failed' ? new Date().toISOString() : undefined,
       latestRun: run.id,
-      outputPreview: toPreview(response.data ?? response.content, 8000),
+      outputPreview: toPreview(outputValue, 8000),
       outputSummary: asPayloadJSON(redactValue(response.data ?? { content: response.content })),
-      status: getTaskStatusForResponse(response),
+      status,
     },
     id: taskID,
     overrideAccess: true,

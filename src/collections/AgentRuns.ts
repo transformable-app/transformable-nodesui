@@ -73,6 +73,26 @@ export const AgentRuns: CollectionConfig = {
     { name: 'errorMessage', type: 'textarea' },
     { name: 'usage', type: 'json' },
     {
+      name: 'remoteDraft',
+      type: 'group',
+      fields: [
+        { name: 'payloadSite', type: 'relationship', relationTo: 'payload-sites' },
+        { name: 'collection', type: 'text' },
+        { name: 'documentID', type: 'text' },
+        { name: 'versionID', type: 'text' },
+        { name: 'operation', type: 'select', options: ['create', 'update'] },
+        { name: 'status', type: 'select', options: ['created', 'failed'] },
+        { name: 'adminURL', type: 'text' },
+        { name: 'previewURL', type: 'text' },
+        { name: 'locale', type: 'text' },
+        { name: 'tenant', type: 'text' },
+        { name: 'mediaIDs', type: 'json' },
+        { name: 'response', type: 'json' },
+        { name: 'error', type: 'textarea' },
+        { name: 'lastSyncedAt', type: 'date' },
+      ],
+    },
+    {
       name: 'feedback',
       type: 'group',
       fields: [
