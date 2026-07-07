@@ -19,6 +19,12 @@ export type AgentInvocation = {
 }
 
 export type AgentInvokeResult = {
+  approval?: {
+    expiresAt?: string
+    prompt?: string
+    resumeURL: string
+    title?: string
+  }
   content: string
   data?: Record<string, unknown>
   n8nExecutionID?: string

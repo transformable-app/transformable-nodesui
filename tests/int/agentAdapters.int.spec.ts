@@ -69,6 +69,27 @@ describe('agent transport adapters', () => {
     })
   })
 
+  it('preserves webhook approval envelopes for Payload-mediated HITL', () => {
+    expect(
+      parseWebhookResponse({
+        approval: {
+          prompt: 'Approve this draft?',
+          resumeURL: 'https://n8n.example.com/webhook-waiting/resume/abc',
+          title: 'Draft approval',
+        },
+        content: 'Waiting for approval',
+        status: 'waiting',
+      }),
+    ).toMatchObject({
+      approval: {
+        prompt: 'Approve this draft?',
+        resumeURL: 'https://n8n.example.com/webhook-waiting/resume/abc',
+        title: 'Draft approval',
+      },
+      status: 'waiting',
+    })
+  })
+
   it('preserves webhook output objects as structured data', () => {
     expect(
       parseWebhookResponse({

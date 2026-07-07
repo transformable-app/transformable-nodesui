@@ -36,6 +36,12 @@ export type AgentPlanOutputBinding = {
   }>
   operation?: 'create' | 'update'
   payloadSite: string
+  relationshipResolvers?: Array<{
+    collection: string
+    matchField?: string
+    required?: boolean
+    targetPath: string
+  }>
 }
 
 export type AgentPlanTaskInput = {

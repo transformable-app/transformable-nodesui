@@ -80,6 +80,9 @@ const normalizeOutputBinding = ({
   if (value.fieldMappings !== undefined && !Array.isArray(value.fieldMappings)) {
     errors.push(`${label}.fieldMappings must be an array.`)
   }
+  if (value.relationshipResolvers !== undefined && !Array.isArray(value.relationshipResolvers)) {
+    errors.push(`${label}.relationshipResolvers must be an array.`)
+  }
 
   const fieldMappings = Array.isArray(value.fieldMappings)
     ? value.fieldMappings
@@ -99,6 +102,41 @@ const normalizeOutputBinding = ({
 
   if (!payloadSite || !collection || operation === null) return undefined
 
+  const relationshipResolvers = Array.isArray(value.relationshipResolvers)
+    ? value.relationshipResolvers
+        .map((resolver, index) => {
+          if (!isPlainObject(resolver)) {
+            errors.push(`${label}.relationshipResolvers[${index}] must be an object.`)
+            return null
+          }
+
+          const targetPath = cleanString(resolver.targetPath)
+          const resolverCollection = cleanString(resolver.collection)
+          if (!targetPath) errors.push(`${label}.relationshipResolvers[${index}].targetPath is required.`)
+          if (!resolverCollection) {
+            errors.push(`${label}.relationshipResolvers[${index}].collection is required.`)
+          }
+
+          if (!targetPath || !resolverCollection) return null
+
+          const matchField = cleanString(resolver.matchField)
+          return {
+            collection: resolverCollection,
+            ...(matchField ? { matchField } : {}),
+            ...(typeof resolver.required === 'boolean' ? { required: resolver.required } : {}),
+            targetPath,
+          }
+        })
+        .filter(
+          (resolver): resolver is {
+            collection: string
+            matchField?: string
+            required?: boolean
+            targetPath: string
+          } => Boolean(resolver),
+        )
+    : undefined
+
   return {
     allowedBlocks: cleanStringArray(value.allowedBlocks),
     allowedFields: cleanStringArray(value.allowedFields),
@@ -106,6 +144,7 @@ const normalizeOutputBinding = ({
     fieldMappings,
     operation,
     payloadSite,
+    relationshipResolvers,
   }
 }
 

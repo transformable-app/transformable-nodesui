@@ -100,6 +100,70 @@ export const writeDraftDocument = async ({
   return body as Record<string, unknown>
 }
 
+export const findRemoteDocumentID = async ({
+  collection,
+  limit = 2,
+  matchField,
+  matchValue,
+  site,
+}: {
+  collection: string
+  limit?: number
+  matchField: string
+  matchValue: string
+  site: PayloadSiteConfig
+}) => {
+  const encodedCollection = encodeURIComponent(collection)
+  const params = new URLSearchParams({
+    depth: '0',
+    limit: String(limit),
+  })
+  params.set(`where[${matchField}][equals]`, matchValue)
+
+  const endpoint = buildPayloadSiteEndpoint({
+    baseURL: site.baseURL,
+    path: `/api/${encodedCollection}?${params.toString()}`,
+  })
+
+  const response = await fetch(endpoint, {
+    headers: {
+      accept: 'application/json',
+      authorization: getPayloadAPIKeyAuthHeader(site),
+    },
+    method: 'GET',
+  })
+
+  const body = await readJSON(response)
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+        ? body.error
+        : `Payload site relationship lookup failed with ${response.status}.`
+    throw new APIError(message, response.status)
+  }
+
+  const docs = body && typeof body === 'object' && 'docs' in body ? (body as { docs?: unknown }).docs : undefined
+  if (!Array.isArray(docs)) {
+    throw new APIError('Payload site relationship lookup returned an invalid response.', 502)
+  }
+  if (docs.length === 0) return null
+  if (docs.length > 1) {
+    throw new APIError(
+      `Payload site relationship lookup for ${collection}.${matchField} matched multiple documents.`,
+      400,
+    )
+  }
+
+  const doc = docs[0]
+  if (!doc || typeof doc !== 'object' || !('id' in doc)) {
+    throw new APIError('Payload site relationship lookup response did not include an id.', 502)
+  }
+
+  const id = doc.id
+  return typeof id === 'string' || typeof id === 'number' ? String(id) : null
+}
+
 export const uploadMediaDocument = async ({
   alt,
   caption,

@@ -6,6 +6,7 @@ import { invokeN8nAgent } from '@/n8n/agents/adapters'
 import { redactValue, toPreview } from '@/n8n/agents/redact'
 import { userCanInvokeAgent } from '@/n8n/agents/resolveAgent'
 import { AgentHarnessError, type AgentRequest } from '@/n8n/agents/types'
+import { assertSameServerURL } from '@/n8n/agents/buildEndpoint'
 
 import { failPlanTask, finalizePlanTask, refreshPlanStatus } from './finalizeTask'
 import { selectRunnableTasks } from './selectRunnableTasks'
@@ -59,6 +60,61 @@ const getDependencyOutputs = (task: AgentPlanTask, tasks: AgentPlanTask[]) => {
       }
     })
     .filter((dependency): dependency is NonNullable<typeof dependency> => Boolean(dependency))
+}
+
+const createPlanApprovalFromResponse = async ({
+  agent,
+  req,
+  response,
+  runID,
+  server,
+  sessionID,
+}: {
+  agent: Record<string, unknown>
+  req: AgentRequest
+  response: { approval?: { expiresAt?: string; prompt?: string; resumeURL: string; title?: string } }
+  runID: string
+  server: Record<string, unknown>
+  sessionID: string
+}) => {
+  if (!response.approval?.resumeURL) return
+
+  const agentID = getRelationshipID(agent)
+  if (!agentID) return
+
+  const existingApproval = await req.payload.find({
+    collection: 'agent-approvals',
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    req,
+    where: {
+      and: [{ run: { equals: runID } }, { status: { in: ['pending', 'consuming'] } }],
+    },
+  })
+  if (existingApproval.docs[0]) return
+
+  const resumeURL = assertSameServerURL({
+    baseURL: server.baseURL,
+    targetURL: response.approval.resumeURL,
+  }).toString()
+
+  await req.payload.create({
+    collection: 'agent-approvals',
+    data: {
+      agent: agentID,
+      expiresAt: response.approval.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      prompt: response.approval.prompt || 'This plan task is waiting for approval.',
+      resumeURL,
+      run: runID,
+      session: sessionID,
+      status: 'pending',
+      title: response.approval.title || 'Plan task approval',
+      user: req.user.id,
+    },
+    overrideAccess: true,
+    req,
+  })
 }
 
 const ensurePlanSession = async ({
@@ -125,9 +181,11 @@ const dispatchPlanTask = async ({
   const dependencyOutputs = getDependencyOutputs(task, tasks)
   const invocationData = {
     dependencyOutputs,
+    expectedOutput: task.expectedOutput,
     input,
     instructions: task.instructions,
     objective: plan.objective,
+    outputBinding: task.outputBinding,
     planID: plan.id,
     taskID: task.taskID,
     title: task.title,
@@ -211,6 +269,17 @@ const dispatchPlanTask = async ({
       overrideAccess: true,
       req,
     })
+
+    if (response.status === 'waiting') {
+      await createPlanApprovalFromResponse({
+        agent,
+        req,
+        response,
+        runID: String(updatedRun.id),
+        server,
+        sessionID,
+      })
+    }
 
     await finalizePlanTask({
       req,

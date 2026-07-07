@@ -1,7 +1,10 @@
+import { readFile } from 'fs/promises'
+import path from 'path'
+
 import { APIError, type PayloadRequest } from 'payload'
 
-import { uploadMediaDocument, writeDraftDocument } from '@/payloadSites/client'
-import type { AgentArtifact, PayloadSite, RemoteDraftAudit } from '@/payload-types'
+import { findRemoteDocumentID, uploadMediaDocument, writeDraftDocument } from '@/payloadSites/client'
+import type { AgentArtifact, Media, PayloadSite, RemoteDraftAudit } from '@/payload-types'
 
 type CMSDraftTarget = {
   collection: string
@@ -39,7 +42,26 @@ type CMSDraftOutputBinding = {
   }>
   operation?: 'create' | 'update'
   payloadSite: string
+  relationshipResolvers?: Array<{
+    collection: string
+    matchField?: string
+    required?: boolean
+    targetPath: string
+  }>
 }
+
+type CMSDraftMediaSource =
+  | {
+      sourceURL: string
+      type: 'url'
+    }
+  | {
+      filename: string
+      localPath: string
+      mimeType: string
+      size?: number
+      type: 'local-media'
+    }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value))
@@ -217,6 +239,31 @@ const parseOutputBinding = (value: unknown): CMSDraftOutputBinding | null => {
         })
         .filter((mapping): mapping is { sourcePath: string; targetPath: string } => Boolean(mapping))
     : undefined
+  const relationshipResolvers = Array.isArray(value.relationshipResolvers)
+    ? value.relationshipResolvers
+        .map((resolver) => {
+          if (!isPlainObject(resolver)) return null
+          const targetPath = getString(resolver.targetPath)
+          const collection = getString(resolver.collection)
+          if (!targetPath || !collection) return null
+
+          const matchField = getString(resolver.matchField)
+          return {
+            collection,
+            ...(matchField ? { matchField } : {}),
+            ...(typeof resolver.required === 'boolean' ? { required: resolver.required } : {}),
+            targetPath,
+          }
+        })
+        .filter(
+          (resolver): resolver is {
+            collection: string
+            matchField?: string
+            required?: boolean
+            targetPath: string
+          } => Boolean(resolver),
+        )
+    : undefined
 
   if (!payloadSite || !collection) return null
 
@@ -227,6 +274,7 @@ const parseOutputBinding = (value: unknown): CMSDraftOutputBinding | null => {
     fieldMappings,
     operation,
     payloadSite,
+    relationshipResolvers,
   }
 }
 
@@ -415,6 +463,87 @@ const setValueAtPath = (target: Record<string, unknown>, path: string, value: un
   current[finalKey] = value
 }
 
+const getValueAtPath = (target: Record<string, unknown>, path: string) => {
+  const parts = path.split('.').filter(Boolean)
+  if (parts.length === 0 || parts.some((part) => part === '__proto__' || part === 'constructor')) {
+    throw new APIError(`Invalid field path "${path}".`, 400)
+  }
+
+  let current: unknown = target
+  for (const part of parts) {
+    if (Array.isArray(current)) {
+      const index = Number(part)
+      if (!Number.isInteger(index) || index < 0) return undefined
+      current = current[index]
+      continue
+    }
+
+    if (!isPlainObject(current)) return undefined
+    current = current[part]
+  }
+
+  return current
+}
+
+const getRelationshipLookupValues = (value: unknown) => {
+  if (Array.isArray(value)) return value.map(getString).filter((item): item is string => Boolean(item))
+  const single = getString(value)
+  return single ? [single] : []
+}
+
+const resolveRelationshipValues = async ({
+  binding,
+  document,
+  req,
+  site,
+}: {
+  binding: CMSDraftOutputBinding
+  document: Record<string, unknown>
+  req: PayloadRequest
+  site: PayloadSite
+}) => {
+  if (!binding.relationshipResolvers?.length) return
+
+  for (const resolver of binding.relationshipResolvers) {
+    const currentValue = getValueAtPath(document, resolver.targetPath)
+    if (currentValue === undefined || currentValue === null || currentValue === '') {
+      if (resolver.required) {
+        throw new APIError(`Relationship field "${resolver.targetPath}" is required by output binding.`, 400)
+      }
+      continue
+    }
+
+    const lookupValues = getRelationshipLookupValues(currentValue)
+    if (lookupValues.length === 0) {
+      throw new APIError(`Relationship field "${resolver.targetPath}" must be a string or string array.`, 400)
+    }
+
+    const resolvedIDs: string[] = []
+    for (const lookupValue of lookupValues) {
+      const resolvedID = await findRemoteDocumentID({
+        collection: resolver.collection,
+        matchField: resolver.matchField || 'slug',
+        matchValue: lookupValue,
+        site,
+      })
+
+      if (!resolvedID) {
+        if (resolver.required !== false) {
+          throw new APIError(
+            `Relationship field "${resolver.targetPath}" could not resolve "${lookupValue}" in ${resolver.collection}.`,
+            400,
+          )
+        }
+        continue
+      }
+
+      resolvedIDs.push(resolvedID)
+    }
+
+    setValueAtPath(document, resolver.targetPath, Array.isArray(currentValue) ? resolvedIDs : resolvedIDs[0])
+  }
+}
+
 const parseCMSDraftOutput = (value: unknown): CMSDraftOutput => {
   if (!isPlainObject(value)) {
     throw new APIError('CMS draft output must be an object.', 400)
@@ -503,23 +632,69 @@ const assertSiteCanWrite = (site: PayloadSite, collection: string) => {
   }
 }
 
-const getArtifactSourceURL = (artifact: AgentArtifact): string | undefined => {
-  if (artifact.kind === 'url') return artifact.url || undefined
-  if (artifact.kind === 'media' && artifact.url) return artifact.url
+const getArtifactSourceURL = (artifact: AgentArtifact): CMSDraftMediaSource | undefined => {
+  if (artifact.kind === 'url' && artifact.url) return { sourceURL: artifact.url, type: 'url' }
+  if (artifact.kind === 'media' && artifact.url) return { sourceURL: artifact.url, type: 'url' }
   if (artifact.data && isPlainObject(artifact.data)) {
-    return getString(artifact.data.url) ?? getString(artifact.data.sourceURL)
+    const sourceURL = getString(artifact.data.url) ?? getString(artifact.data.sourceURL)
+    if (sourceURL) return { sourceURL, type: 'url' }
   }
   return undefined
 }
 
-const getSourceURL = async ({
+const getMediaFromArtifact = async ({
+  artifact,
+  req,
+}: {
+  artifact: AgentArtifact
+  req: PayloadRequest
+}): Promise<Media | null> => {
+  const mediaID = getRelationshipID(artifact.media)
+  if (artifact.media && typeof artifact.media === 'object' && 'filename' in artifact.media) {
+    return artifact.media as Media
+  }
+  if (!mediaID) return null
+
+  return req.payload.findByID({
+    collection: 'media',
+    depth: 0,
+    id: mediaID,
+    overrideAccess: true,
+    req,
+  })
+}
+
+const getArtifactLocalMediaSource = async ({
+  artifact,
+  req,
+}: {
+  artifact: AgentArtifact
+  req: PayloadRequest
+}): Promise<CMSDraftMediaSource | undefined> => {
+  if (artifact.kind !== 'media') return undefined
+
+  const media = await getMediaFromArtifact({ artifact, req })
+  const filename = getString(media?.filename)
+  const mimeType = getString(media?.mimeType)
+  if (!filename || !mimeType) return undefined
+
+  return {
+    filename,
+    localPath: path.join(process.cwd(), 'public', 'media', path.basename(filename)),
+    mimeType,
+    size: typeof media?.filesize === 'number' ? media.filesize : undefined,
+    type: 'local-media',
+  }
+}
+
+const getMediaSource = async ({
   mediaRequest,
   req,
 }: {
   mediaRequest: CMSDraftMediaRequest
   req: PayloadRequest
-}) => {
-  if (mediaRequest.sourceURL) return mediaRequest.sourceURL
+}): Promise<CMSDraftMediaSource | undefined> => {
+  if (mediaRequest.sourceURL) return { sourceURL: mediaRequest.sourceURL, type: 'url' }
   if (!mediaRequest.artifactID) return undefined
 
   const artifact = await req.payload.findByID({
@@ -530,7 +705,7 @@ const getSourceURL = async ({
     req,
   })
 
-  return getArtifactSourceURL(artifact)
+  return getArtifactSourceURL(artifact) ?? getArtifactLocalMediaSource({ artifact, req })
 }
 
 const getFilenameFromURL = (sourceURL: string, mimeType: string, fallbackID: string) => {
@@ -610,6 +785,51 @@ const fetchMediaBlob = async ({
   }
 }
 
+const readLocalMediaBlob = async ({
+  mediaRequest,
+  site,
+  source,
+}: {
+  mediaRequest: CMSDraftMediaRequest
+  site: PayloadSite
+  source: Extract<CMSDraftMediaSource, { type: 'local-media' }>
+}) => {
+  const policy = getMediaPolicy(site)
+  if (!policy.allowedMimeTypes.includes(source.mimeType)) {
+    throw new APIError(`Media request "${mediaRequest.id}" returned disallowed MIME type ${source.mimeType}.`, 400)
+  }
+  if (source.size && source.size > policy.maxFileSizeBytes) {
+    throw new APIError(`Media request "${mediaRequest.id}" exceeds the target site media size limit.`, 400)
+  }
+
+  const buffer = await readFile(source.localPath)
+  if (buffer.byteLength > policy.maxFileSizeBytes) {
+    throw new APIError(`Media request "${mediaRequest.id}" exceeds the target site media size limit.`, 400)
+  }
+
+  return {
+    blob: new Blob([buffer], { type: source.mimeType }),
+    filename: source.filename,
+    mimeType: source.mimeType,
+  }
+}
+
+const resolveMediaBlob = ({
+  mediaRequest,
+  site,
+  source,
+}: {
+  mediaRequest: CMSDraftMediaRequest
+  site: PayloadSite
+  source: CMSDraftMediaSource
+}) => {
+  if (source.type === 'url') {
+    return fetchMediaBlob({ mediaRequest, site, sourceURL: source.sourceURL })
+  }
+
+  return readLocalMediaBlob({ mediaRequest, site, source })
+}
+
 const createRemoteDraftAudit = async ({
   audit,
   req,
@@ -647,12 +867,12 @@ const resolveMediaRequests = async ({
 
   const mediaIDs: string[] = []
   for (const mediaRequest of mediaRequests) {
-    const sourceURL = await getSourceURL({ mediaRequest, req })
-    if (!sourceURL) {
-      throw new APIError(`Media request "${mediaRequest.id}" did not resolve to a source URL.`, 400)
+    const source = await getMediaSource({ mediaRequest, req })
+    if (!source) {
+      throw new APIError(`Media request "${mediaRequest.id}" did not resolve to a media source.`, 400)
     }
 
-    const fetched = await fetchMediaBlob({ mediaRequest, site, sourceURL })
+    const fetched = await resolveMediaBlob({ mediaRequest, site, source })
     const upload = await uploadMediaDocument({
       alt: mediaRequest.alt,
       caption: mediaRequest.caption,
@@ -701,6 +921,12 @@ export const writeCMSDraftFromTaskOutput = async ({
       collection: draft.target.collection,
       document,
       mediaRequests: draft.mediaRequests,
+      site,
+    })
+    await resolveRelationshipValues({
+      binding,
+      document,
+      req,
       site,
     })
     const mediaIDs = await resolveMediaRequests({

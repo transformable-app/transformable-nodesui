@@ -10,7 +10,7 @@ Importable n8n workflow JSON files for testing the Payload agent harness. They m
 | [test-agent-echo-webhook.json](./test-agent-echo-webhook.json) | `/webhook/test-agent-echo` | Returns `Echo: <user text>` from the harness `input.text` field. |
 | [test-agent-async-waiting.json](./test-agent-async-waiting.json) | `/webhook/test-agent-async` | Returns `status: "waiting"` only. Use with a manual Payload callback curl. |
 | [test-agent-async-callback.json](./test-agent-async-callback.json) | `/webhook/test-agent-async-callback` | Returns `waiting`, then POSTs a completion callback to Payload in the same execution. |
-| [structured-plan-echo.json](./structured-plan-echo.json) | `/webhook/structured-plan-echo` | Structured AgentPlanBlock smoke test. Echoes one task invocation and returns `output` plus `summary`. |
+| [structured-plan-echo.json](./structured-plan-echo.json) | `/webhook/structured-plan-echo` | Structured AgentPlanBlock smoke test. Returns a CMS draft envelope for `cms-draft` tasks and can demo Payload-mediated n8n HITL approval when the workflow provides a resume URL. |
 
 Start with **test-agent-webhook.json** when using **Set up test agent** on the dashboard (endpoint path `/webhook/test-agent`).
 
@@ -102,6 +102,48 @@ Payload-side vars (not in these JSON files):
 ```
 
 ### Structured plan task (structured-plan-echo)
+
+The workflow can participate in Payload-mediated HITL approval. If the task input includes `demoApproval: true` and the n8n workflow has a HITL/wait node that exposes a resume URL, the response can include:
+
+```json
+{
+  "requestID": "<from harness invocation>",
+  "status": "waiting",
+  "content": "Waiting for approval in Payload.",
+  "approval": {
+    "title": "Review structured plan task",
+    "prompt": "Approve draft before continuing?",
+    "resumeURL": "<n8n resume URL>"
+  },
+  "n8nExecutionID": "<execution id>"
+}
+```
+
+Payload stores the resume URL on an `agent-approvals` record. The browser approves through `POST /api/agent-approvals/:id/resolve`; Payload then posts to n8n server-side, so the n8n resume URL is never exposed to the user.
+
+For `cms-draft` tasks, the workflow returns:
+
+```json
+{
+  "requestID": "<from harness invocation>",
+  "status": "succeeded",
+  "output": {
+    "target": {
+      "payloadSite": "<input.data.outputBinding.payloadSite>",
+      "collection": "<input.data.outputBinding.collection>",
+      "operation": "create"
+    },
+    "document": {
+      "title": "<input.data.title>"
+    },
+    "mediaRequests": []
+  },
+  "summary": "Completed <taskID> for plan <planID>",
+  "n8nExecutionID": "<execution id>"
+}
+```
+
+For non-CMS tasks, it still returns an echo-style output:
 
 ```json
 {

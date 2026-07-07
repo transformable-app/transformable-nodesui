@@ -124,7 +124,15 @@ Every `cms-draft` plan task must include an explicit `outputBinding`, either on 
     "collection": "pages",
     "operation": "create",
     "allowedFields": ["title", "layout", "layout.*"],
-    "allowedBlocks": ["hero", "content"]
+    "allowedBlocks": ["hero", "content"],
+    "relationshipResolvers": [
+      {
+        "targetPath": "category",
+        "collection": "categories",
+        "matchField": "slug",
+        "required": true
+      }
+    ]
   }
 }
 ```
@@ -148,4 +156,24 @@ The generated task output must still include its own target envelope:
 
 NodesUI rejects the write if the output target does not match the binding, if the document violates binding/site field or block allowlists, or if media requests point at disallowed URLs or MIME types.
 
+`relationshipResolvers` convert generated relationship values into target-site document IDs before the draft is written. In the example above, a generated `"category": "news"` value is resolved by querying the target Payload site for one `categories` document where `slug` equals `news`; the draft receives that remote document ID.
+
 Each known-site remote write attempt also appends a `remote-draft-audits` record with the run, target site, target envelope, binding, request document, result or error, and review URLs when available. Audit records are Admin-readable and append-only.
+
+Media requests can reference either a direct `sourceURL` or an `artifactID`:
+
+```json
+{
+  "mediaRequests": [
+    {
+      "id": "hero",
+      "purpose": "block-asset",
+      "artifactID": "agent-artifact-id",
+      "targetFieldPath": "hero.image",
+      "alt": "Hero image"
+    }
+  ]
+}
+```
+
+For URL artifacts, NodesUI fetches the URL after applying URL policy checks. For `media` artifacts linked to a local NodesUI `media` upload, NodesUI reads the local upload file and then uploads it to the target site's media collection. The final document receives the target-site media ID, not the local NodesUI media ID.

@@ -54,7 +54,7 @@ export const AGENT_PLAN_SAMPLE_WORKFLOWS: SampleN8nWorkflow[] = [
   {
     category: 'agent-plan',
     description:
-      'Accepts one structured plan task invocation and echoes the task output summary for AgentPlanBlock smoke tests.',
+      'Accepts one structured plan task invocation. Returns a CMS draft envelope for cms-draft tasks and can demo Payload-mediated HITL approval when n8n provides a resume URL.',
     endpointPath: '/webhook/structured-plan-echo',
     filename: 'structured-plan-echo.json',
     label: 'Structured Plan Echo (Webhook)',

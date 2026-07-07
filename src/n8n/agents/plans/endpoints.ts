@@ -26,6 +26,16 @@ const requireUser = (req: Parameters<Endpoint['handler']>[0]) => {
   if (!req.user) throw new AgentHarnessError('auth', 'Unauthorized.', 401)
 }
 
+const getRelationshipID = (value: unknown): string | null => {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && 'id' in value) {
+    const id = (value as { id?: unknown }).id
+    return typeof id === 'string' ? id : null
+  }
+
+  return null
+}
+
 export const agentPlanCollectionEndpoints: Endpoint[] = [
   {
     path: '/validate',
@@ -192,6 +202,75 @@ export const agentPlanCollectionEndpoints: Endpoint[] = [
     },
   },
   {
+    path: '/:id/tasks/:taskID/approve',
+    method: 'post',
+    handler: async (req) => {
+      try {
+        requireUser(req)
+        const planID = String(req.routeParams?.id ?? '')
+        const taskParam = String(req.routeParams?.taskID ?? '')
+        if (!planID || !taskParam) {
+          throw new AgentHarnessError('input-validation', 'Plan and task are required.', 400)
+        }
+
+        await req.payload.findByID({
+          collection: 'agent-plans',
+          depth: 0,
+          id: planID,
+          overrideAccess: false,
+          req,
+          user: req.user,
+        })
+
+        const byID = await req.payload
+          .findByID({
+            collection: 'agent-plan-tasks',
+            depth: 0,
+            id: taskParam,
+            overrideAccess: true,
+            req,
+          })
+          .catch(() => null)
+
+        const task =
+          byID && getRelationshipID(byID.plan) === planID
+            ? byID
+            : (
+                await req.payload.find({
+                  collection: 'agent-plan-tasks',
+                  depth: 0,
+                  limit: 1,
+                  overrideAccess: true,
+                  req,
+                  where: {
+                    and: [{ plan: { equals: planID } }, { taskID: { equals: taskParam } }],
+                  },
+                })
+              ).docs[0]
+
+        if (!task) throw new AgentHarnessError('not-found', 'Plan task not found.', 404)
+        if (task.status !== 'needs-approval') {
+          throw new AgentHarnessError('input-validation', 'Plan task is not waiting for approval.', 400)
+        }
+
+        const updatedTask = await req.payload.update({
+          collection: 'agent-plan-tasks',
+          data: {
+            status: 'pending',
+          },
+          id: task.id,
+          overrideAccess: true,
+          req,
+        })
+
+        const result = await runPlanLoop({ planID, req })
+        return Response.json({ ok: true, result, task: updatedTask })
+      } catch (error) {
+        return handlePlanError(error)
+      }
+    },
+  },
+  {
     path: '/:id/tasks',
     method: 'get',
     handler: async (req) => {
@@ -217,7 +296,51 @@ export const agentPlanCollectionEndpoints: Endpoint[] = [
           where: { plan: { equals: planID } },
         })
 
-        return Response.json(tasks)
+        const latestRunIDs = tasks.docs
+          .map((task) => getRelationshipID(task.latestRun))
+          .filter((id): id is string => Boolean(id))
+        const approvals =
+          latestRunIDs.length > 0
+            ? await req.payload.find({
+                collection: 'agent-approvals',
+                depth: 0,
+                limit: 100,
+                overrideAccess: false,
+                req,
+                user: req.user,
+                where: {
+                  and: [{ run: { in: latestRunIDs } }, { status: { equals: 'pending' } }],
+                },
+              })
+            : { docs: [] }
+
+        const approvalsByRun = new Map(
+          approvals.docs
+            .map((approval) => {
+              const runID = getRelationshipID(approval.run)
+              return runID ? [runID, approval] : null
+            })
+            .filter((entry): entry is [string, (typeof approvals.docs)[number]] => Boolean(entry)),
+        )
+
+        return Response.json({
+          ...tasks,
+          docs: tasks.docs.map((task) => {
+            const latestRunID = getRelationshipID(task.latestRun)
+            const approval = latestRunID ? approvalsByRun.get(latestRunID) : undefined
+            return {
+              ...task,
+              pendingApproval: approval
+                ? {
+                    expiresAt: approval.expiresAt,
+                    id: approval.id,
+                    prompt: approval.prompt,
+                    title: approval.title,
+                  }
+                : undefined,
+            }
+          }),
+        })
       } catch (error) {
         return handlePlanError(error)
       }

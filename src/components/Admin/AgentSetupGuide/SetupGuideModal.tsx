@@ -4,10 +4,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { Button, CopyToClipboard } from '@payloadcms/ui'
 
-import {
-  buildSmokeTestSnippet,
-  type AgentSetupGuideResponse,
-} from '@/n8n/agents/testAgentSetup'
+import type { AgentSetupGuideResponse } from '@/n8n/agents/testAgentSetup'
 import {
   DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW,
   getRecommendedSampleWorkflow,
@@ -52,7 +49,6 @@ export const AgentSetupGuideModal = ({
   syncingWorkflows: boolean
 }) => {
   const responseExample = JSON.stringify(result.instructions.n8nResponseExample, null, 2)
-  const smokeTestSnippet = buildSmokeTestSnippet(result.agent?.slug || 'your-agent-slug')
   const title =
     result.mode === 'test-setup' ? 'Test agent setup' : `Setup guide${result.agent?.name ? `: ${result.agent.name}` : ''}`
   const transportLabel = getTransportLabel(result.instructions.transport)
@@ -180,14 +176,10 @@ export const AgentSetupGuideModal = ({
           <pre>{responseExample}</pre>
         </div>
 
-        <details className="agentSetupGuide__smoke-test">
-          <summary>Run smoke test in browser console</summary>
-          <div className="agentSetupGuide__example-header">
-            <span>Copy into the admin browser console after the checklist is complete.</span>
-            <CopyToClipboard value={smokeTestSnippet} />
-          </div>
-          <pre>{smokeTestSnippet}</pre>
-        </details>
+        <div className="agentSetupGuide__smoke-test">
+          <strong>Test the agent</strong>
+          <p>After the checklist is complete, try this agent from a page with an Agent Chat block.</p>
+        </div>
 
         <div className="agentSetupGuide__modal-actions">
           <Button
@@ -209,11 +201,6 @@ export const AgentSetupGuideModal = ({
           </Button>
         </div>
 
-        <p className="agentSetupGuide__help">
-          Workflow source files in <code>docs/n8n-workflows/</code>. List API:{' '}
-          <a href="/api/n8n/sample-workflows">/api/n8n/sample-workflows</a>. Full manual steps:{' '}
-          <code>docs/agent-harness-testing.md</code>.
-        </p>
       </div>
     </div>
   )

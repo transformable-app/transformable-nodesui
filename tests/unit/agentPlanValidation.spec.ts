@@ -112,6 +112,7 @@ describe('agent plan validation', () => {
         collection: 'pages',
         fieldMappings: [{ sourcePath: 'draft.title', targetPath: 'title' }],
         payloadSite: 'primary',
+        relationshipResolvers: [{ collection: 'categories', matchField: 'slug', targetPath: 'category' }],
       },
       tasks: [
         {
@@ -131,8 +132,33 @@ describe('agent plan validation', () => {
           allowedFields: ['title', 'layout'],
           collection: 'pages',
           payloadSite: 'primary',
+          relationshipResolvers: [{ collection: 'categories', matchField: 'slug', targetPath: 'category' }],
         }),
       )
+    }
+  })
+
+  it('rejects invalid relationship resolver configuration', () => {
+    const result = validateAgentPlanInput({
+      ...validPlan,
+      outputBinding: {
+        collection: 'pages',
+        payloadSite: 'primary',
+        relationshipResolvers: [{ collection: 'categories' }],
+      },
+      tasks: [
+        {
+          expectedOutput: { type: 'cms-draft' },
+          id: 'draft',
+          instructions: 'Draft CMS content',
+          title: 'Draft',
+        },
+      ],
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.errors).toContain('outputBinding.relationshipResolvers[0].targetPath is required.')
     }
   })
 })

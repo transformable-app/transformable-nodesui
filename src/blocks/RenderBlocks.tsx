@@ -1,6 +1,7 @@
 import React, { Fragment } from 'react'
 
 import { AgentChatBlock } from '@/blocks/AgentChat/Component'
+import { AgentPlanBlock } from '@/blocks/AgentPlan/Component'
 import { ChatEmbedBlock } from '@/blocks/ChatEmbed/Component'
 import { CredentialsHealthBlock } from '@/blocks/CredentialsHealth/Component'
 import { DataTableViewerBlock } from '@/blocks/DataTableViewer/Component'
@@ -12,6 +13,7 @@ import { WorkflowsListBlock } from '@/blocks/WorkflowsList/Component'
 
 const blockComponents = {
   agentChat: AgentChatBlock,
+  agentPlan: AgentPlanBlock,
   chatEmbed: ChatEmbedBlock,
   credentialsHealth: CredentialsHealthBlock,
   dataTableViewer: DataTableViewerBlock,

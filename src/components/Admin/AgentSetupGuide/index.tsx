@@ -68,7 +68,7 @@ export const AgentSetupGuideField: UIFieldClientComponent = () => {
     <div className="agentSetupGuide__field">
       <p className="agentSetupGuide__field-copy">
         Every agent needs a matching production workflow in n8n. Open the setup guide for env vars,
-        webhook steps, sync checks, and a smoke-test snippet for this agent.
+        webhook steps, sync checks, and Agent Chat block testing guidance.
       </p>
       <button
         className="agentSetupGuide__trigger"

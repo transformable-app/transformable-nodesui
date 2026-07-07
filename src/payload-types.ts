@@ -204,6 +204,7 @@ export interface Page {
     | ExecutionErrorsBlock
     | DataTableViewerBlock
     | AgentChatBlock
+    | AgentPlanBlock
     | ChatEmbedBlock
     | FormBlock
   )[];
@@ -597,6 +598,17 @@ export interface Agent {
   configurationWarning?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "AgentPlanBlock".
+ */
+export interface AgentPlanBlock {
+  title: string;
+  description?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'agentPlan';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1895,6 +1907,7 @@ export interface PagesSelect<T extends boolean = true> {
         executionErrors?: T | ExecutionErrorsBlockSelect<T>;
         dataTableViewer?: T | DataTableViewerBlockSelect<T>;
         agentChat?: T | AgentChatBlockSelect<T>;
+        agentPlan?: T | AgentPlanBlockSelect<T>;
         chatEmbed?: T | ChatEmbedBlockSelect<T>;
         formBlock?: T | FormBlockSelect<T>;
       };
@@ -2001,6 +2014,16 @@ export interface AgentChatBlockSelect<T extends boolean = true> {
   title?: T;
   description?: T;
   agent?: T;
+  id?: T;
+  blockName?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "AgentPlanBlock_select".
+ */
+export interface AgentPlanBlockSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
   id?: T;
   blockName?: T;
 }

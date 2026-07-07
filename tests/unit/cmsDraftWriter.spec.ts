@@ -1,17 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { PayloadSite } from '@/payload-types'
-import { uploadMediaDocument, writeDraftDocument } from '@/payloadSites/client'
+import { findRemoteDocumentID, uploadMediaDocument, writeDraftDocument } from '@/payloadSites/client'
+import { readFile } from 'fs/promises'
 
 import { writeCMSDraftFromTaskOutput } from '@/n8n/agents/plans/cmsDraftWriter'
 
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn(),
+}))
+
 vi.mock('@/payloadSites/client', () => ({
+  findRemoteDocumentID: vi.fn(),
   uploadMediaDocument: vi.fn(),
   writeDraftDocument: vi.fn(),
 }))
 
+const mockedFindRemoteDocumentID = vi.mocked(findRemoteDocumentID)
 const mockedUploadMediaDocument = vi.mocked(uploadMediaDocument)
 const mockedWriteDraftDocument = vi.mocked(writeDraftDocument)
+const mockedReadFile = vi.mocked(readFile)
 
 const makeSite = (overrides: Partial<PayloadSite> = {}): PayloadSite =>
   ({
@@ -26,7 +34,16 @@ const makeSite = (overrides: Partial<PayloadSite> = {}): PayloadSite =>
     fieldAllowlists: [
       {
         collection: 'pages',
-        paths: ['title', 'hero', 'hero.image', 'layout', 'layout.*', 'layout.*.blockType', 'layout.*.heading'],
+        paths: [
+          'title',
+          'category',
+          'hero',
+          'hero.image',
+          'layout',
+          'layout.*',
+          'layout.*.blockType',
+          'layout.*.heading',
+        ],
       },
     ],
     schemaProfile: {
@@ -56,6 +73,18 @@ const makeReq = (site: PayloadSite) => {
       find: vi.fn(async () => ({ docs: [site] })),
       findByID: vi.fn(async ({ collection }: { collection: string }) => {
         if (collection === 'payload-sites') return site
+        if (collection === 'agent-artifacts') {
+          return {
+            id: 'artifact-1',
+            kind: 'media',
+            media: {
+              id: 'media-local-1',
+              filename: 'local-hero.png',
+              filesize: 5,
+              mimeType: 'image/png',
+            },
+          }
+        }
         throw new Error('not found')
       }),
       update: vi.fn(async (args: Record<string, unknown>) => {
@@ -85,7 +114,16 @@ const output = (overrides: Record<string, unknown> = {}) => ({
 
 const outputBinding = {
   allowedBlocks: ['content'],
-  allowedFields: ['title', 'hero', 'hero.image', 'layout', 'layout.*', 'layout.*.blockType', 'layout.*.heading'],
+  allowedFields: [
+    'title',
+    'category',
+    'hero',
+    'hero.image',
+    'layout',
+    'layout.*',
+    'layout.*.blockType',
+    'layout.*.heading',
+  ],
   collection: 'pages',
   payloadSite: 'primary',
 }
@@ -108,6 +146,8 @@ describe('cms-draft remote writer', () => {
       mimeType: 'image/png',
       response: { id: 'media-1' },
     })
+    mockedFindRemoteDocumentID.mockResolvedValue('category-1')
+    mockedReadFile.mockResolvedValue(Buffer.from('image'))
   })
 
   it('writes a remote draft and records reviewable admin and preview URLs', async () => {
@@ -201,6 +241,86 @@ describe('cms-draft remote writer', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           hero: { image: 'media-1' },
+        }),
+      }),
+    )
+  })
+
+  it('uploads local NodesUI media artifacts without requiring a public source URL', async () => {
+    const req = makeReq(makeSite())
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await writeCMSDraftFromTaskOutput({
+      outputBinding,
+      output: output({
+        document: {
+          hero: {},
+          layout: [{ blockType: 'content', heading: 'Draft heading' }],
+          title: 'Draft page',
+        },
+        mediaRequests: [
+          {
+            alt: 'Local hero',
+            artifactID: 'artifact-1',
+            id: 'hero',
+            purpose: 'block-asset',
+            targetFieldPath: 'hero.image',
+          },
+        ],
+      }),
+      req: req as never,
+      runID: 'run-1',
+    })
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(mockedReadFile).toHaveBeenCalledWith(expect.stringContaining('local-hero.png'))
+    expect(mockedUploadMediaDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alt: 'Local hero',
+        filename: 'local-hero.png',
+        mimeType: 'image/png',
+      }),
+    )
+  })
+
+  it('resolves configured relationship fields before writing the remote draft', async () => {
+    const req = makeReq(makeSite())
+
+    await writeCMSDraftFromTaskOutput({
+      outputBinding: {
+        ...outputBinding,
+        relationshipResolvers: [
+          {
+            collection: 'categories',
+            matchField: 'slug',
+            targetPath: 'category',
+          },
+        ],
+      },
+      output: output({
+        document: {
+          category: 'news',
+          layout: [{ blockType: 'content', heading: 'Draft heading' }],
+          title: 'Draft page',
+        },
+      }),
+      req: req as never,
+      runID: 'run-1',
+    })
+
+    expect(mockedFindRemoteDocumentID).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'categories',
+        matchField: 'slug',
+        matchValue: 'news',
+        site: expect.objectContaining({ id: 'site-1' }),
+      }),
+    )
+    expect(mockedWriteDraftDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: 'category-1',
         }),
       }),
     )
