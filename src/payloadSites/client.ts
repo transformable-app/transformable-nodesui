@@ -100,6 +100,47 @@ export const writeDraftDocument = async ({
   return body as Record<string, unknown>
 }
 
+export const publishDraftDocument = async ({
+  collection,
+  id,
+  site,
+}: {
+  collection: string
+  id: string
+  site: PayloadSiteConfig
+}) => {
+  const endpoint = buildPayloadSiteEndpoint({
+    baseURL: site.baseURL,
+    path: `/api/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`,
+  })
+
+  const response = await fetch(endpoint, {
+    body: JSON.stringify({ _status: 'published' }),
+    headers: {
+      accept: 'application/json',
+      authorization: getPayloadAPIKeyAuthHeader(site),
+      'content-type': 'application/json',
+    },
+    method: 'PATCH',
+  })
+
+  const body = await readJSON(response)
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+        ? body.error
+        : `Payload site draft publish failed with ${response.status}.`
+    throw new APIError(message, response.status)
+  }
+
+  if (!body || typeof body !== 'object') {
+    throw new APIError('Payload site draft publish returned an empty response.', 502)
+  }
+
+  return body as Record<string, unknown>
+}
+
 export const findRemoteDocumentID = async ({
   collection,
   limit = 2,

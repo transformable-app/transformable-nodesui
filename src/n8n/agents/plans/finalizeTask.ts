@@ -93,6 +93,7 @@ export const finalizePlanTask = async ({
     req,
   })
   let cmsDraftError: string | undefined
+  let cmsDraftWriteSucceeded = false
 
   if (status === 'succeeded' && getExpectedOutputType(existingTask.expectedOutput) === 'cms-draft') {
     try {
@@ -102,6 +103,7 @@ export const finalizePlanTask = async ({
         req,
         runID,
       })
+      cmsDraftWriteSucceeded = true
     } catch (error) {
       cmsDraftError = error instanceof Error ? error.message : 'CMS draft write failed.'
       await recordCMSDraftWriteFailure({
@@ -112,7 +114,7 @@ export const finalizePlanTask = async ({
     }
   }
 
-  const finalStatus = cmsDraftError ? 'failed' : status
+  const finalStatus = cmsDraftError ? 'failed' : cmsDraftWriteSucceeded ? 'needs-approval' : status
   const task = await req.payload.update({
     collection: 'agent-plan-tasks',
     data: {
@@ -192,6 +194,7 @@ export const finalizePlanTaskFromRun = async ({
 
   const outputValue = response.data ?? response.content
   let cmsDraftError: string | undefined
+  let cmsDraftWriteSucceeded = false
 
   if (
     response.status === 'succeeded' &&
@@ -204,6 +207,7 @@ export const finalizePlanTaskFromRun = async ({
         req: req as PayloadRequest,
         runID: run.id,
       })
+      cmsDraftWriteSucceeded = true
     } catch (error) {
       cmsDraftError = error instanceof Error ? error.message : 'CMS draft write failed.'
       await recordCMSDraftWriteFailure({
@@ -214,7 +218,11 @@ export const finalizePlanTaskFromRun = async ({
     }
   }
 
-  const status = cmsDraftError ? 'failed' : getTaskStatusForResponse(response)
+  const status = cmsDraftError
+    ? 'failed'
+    : cmsDraftWriteSucceeded
+      ? 'needs-approval'
+      : getTaskStatusForResponse(response)
 
   const task = await req.payload.update({
     collection: 'agent-plan-tasks',

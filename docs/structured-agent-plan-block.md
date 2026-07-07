@@ -371,7 +371,7 @@ Remote Payload API calls are not Local API calls, so `overrideAccess` does not a
 - Never serialize server API keys, webhook credentials, or secret environment values to the block.
 - Validate plan input server-side even when the UI validates it first.
 - Treat n8n output as untrusted. Render text safely and validate structured output before using it.
-- Use drafts and explicit approval for CMS write-back. Do not auto-publish generated content on any target Payload site.
+- Use drafts and explicit approval for CMS write-back. NodesUI writes generated content as a target-site draft first; explicit approval publishes that remote draft in the target Payload site.
 - Do not write generated CMS content into the current NodesUI install unless it is explicitly registered as a `payload-sites` target and passes the same API-client path as every other site.
 - Keep target Payload API keys server-side and scoped per site. Use a restricted target-site API key user that can create/update drafts and upload media only for allowed collections.
 - Validate target site, collection, block type, field paths, locale, tenant, remote document ID, media references, and file metadata before remote writes.

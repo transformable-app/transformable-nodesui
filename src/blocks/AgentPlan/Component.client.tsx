@@ -207,7 +207,7 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
       const body = {
         agent: agentID,
         approvalPolicy: {
-          requireBeforeWrite: true,
+          requireBeforeWrite: false,
           requireOnRisk: true,
         },
         mode: 'dependency',
@@ -220,7 +220,8 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
             input: demoApproval ? { demoApproval: true } : undefined,
             instructions,
             outputBinding,
-            riskLevel: 'high',
+            requiresApproval: false,
+            riskLevel: 'medium',
             title: taskTitle,
           },
         ],

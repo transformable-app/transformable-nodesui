@@ -81,7 +81,7 @@ export const AgentRuns: CollectionConfig = {
         { name: 'documentID', type: 'text' },
         { name: 'versionID', type: 'text' },
         { name: 'operation', type: 'select', options: ['create', 'update'] },
-        { name: 'status', type: 'select', options: ['created', 'failed'] },
+        { name: 'status', type: 'select', options: ['created', 'published', 'failed'] },
         { name: 'adminURL', type: 'text' },
         { name: 'previewURL', type: 'text' },
         { name: 'locale', type: 'text' },

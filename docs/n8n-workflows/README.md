@@ -121,6 +121,8 @@ The workflow can participate in Payload-mediated HITL approval. If the task inpu
 
 Payload stores the resume URL on an `agent-approvals` record. The browser approves through `POST /api/agent-approvals/:id/resolve`; Payload then posts to n8n server-side, so the n8n resume URL is never exposed to the user.
 
+For the generated page flow, approval happens after the target-site draft is created. AgentPlanBlock submits the task without pre-write approval, n8n returns a `cms-draft` envelope, NodesUI creates the draft in the target Payload site, then the task pauses as `needs-approval` for review. Approving the task publishes that remote draft in the target Payload site, marks the run's `remoteDraft.status` as `published`, and completes the task without rerunning n8n or creating a duplicate draft.
+
 For `cms-draft` tasks, the workflow returns:
 
 ```json

@@ -1133,7 +1133,7 @@ export interface AgentRun {
     documentID?: string | null;
     versionID?: string | null;
     operation?: ('create' | 'update') | null;
-    status?: ('created' | 'failed') | null;
+    status?: ('created' | 'published' | 'failed') | null;
     adminURL?: string | null;
     previewURL?: string | null;
     locale?: string | null;

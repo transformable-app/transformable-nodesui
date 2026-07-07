@@ -41,7 +41,7 @@ describe('cms-draft finalization', () => {
     mockedWriteCMSDraftFromTaskOutput.mockResolvedValue({ status: 'created' } as never)
   })
 
-  it('finalizes a successful cms-draft task after remote draft write succeeds', async () => {
+  it('pauses a successful cms-draft task for approval after remote draft write succeeds', async () => {
     const req = makeReq()
     const response = {
       content: 'done',
@@ -67,7 +67,8 @@ describe('cms-draft finalization', () => {
         collection: 'agent-plan-tasks',
         data: expect.objectContaining({
           errorMessage: undefined,
-          status: 'succeeded',
+          finishedAt: undefined,
+          status: 'needs-approval',
         }),
         id: 'task-1',
       }),
