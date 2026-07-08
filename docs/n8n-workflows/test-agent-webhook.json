@@ -59,7 +59,7 @@
         "promptType": "define",
         "text": "={{ $json.chatInput }}",
         "options": {
-          "systemMessage": "You are the Payload harness test agent. Reply helpfully and concisely. Use the Calculator tool when the user asks for math. If chatInput is empty, greet the user and confirm the harness is working."
+          "systemMessage": "You are the Payload harness test agent. Reply helpfully and concisely. Use the Calculator tool when the user asks for math. Use the Payload_Read tool when the user asks to inspect approved Payload CMS content. Only read collections approved for this target site, prefer low limits and depth 0, and summarize results instead of dumping full documents. If chatInput is empty, greet the user and confirm the harness is working."
         }
       },
       "id": "c1c1c1c1-3333-4333-8333-333333333301",
@@ -111,6 +111,53 @@
       "type": "@n8n/n8n-nodes-langchain.toolCalculator",
       "typeVersion": 1,
       "position": [840, 520]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Read approved collections from the configured target Payload CMS site using its REST API. Use this for retrieval only. Input placeholders: collection is the Payload collection slug; limit defaults to a small number; depth should usually be 0.",
+        "method": "GET",
+        "url": "https://replace-with-target-payload-site.example.com/api/{collection}?limit={limit}&depth={depth}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": false,
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "collection",
+              "description": "Approved Payload collection slug to read, for example pages, posts, or media.",
+              "type": "string"
+            },
+            {
+              "name": "limit",
+              "description": "Maximum documents to return. Use a small number such as 5 or 10 unless the user asks for more.",
+              "type": "number"
+            },
+            {
+              "name": "depth",
+              "description": "Payload relationship depth. Use 0 by default and never exceed 2.",
+              "type": "number"
+            }
+          ]
+        },
+        "optimizeResponse": true,
+        "responseType": "json",
+        "fieldsToInclude": "selected",
+        "fields": "docs.id,docs.title,docs.slug,docs.updatedAt,totalDocs,page,totalPages,hasNextPage",
+        "truncateResponse": false
+      },
+      "id": "f2f2f2f2-6767-4676-8676-676767676701",
+      "name": "Payload_Read",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1000, 520],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Target Payload read API key"
+        }
+      }
     },
     {
       "parameters": {
@@ -167,9 +214,9 @@
     },
     {
       "parameters": {
-        "content": "## After import\n\n1. Attach **Payload Test Agent Bearer** on the Webhook node.\n2. Attach **OpenAI account** on **OpenAI Chat Model**.\n3. Replace **Calculator** with your own tools, or add more tool sub-nodes.\n4. Publish the workflow, sync into Payload, then run **Set up test agent**.\n\nPayload sends `input.text`, `sessionID`, and `requestID` in the webhook body. **Map Harness Input** normalizes those fields for the agent. **Build Harness Response** shapes the JSON Payload expects.",
-        "height": 260,
-        "width": 420,
+        "content": "## After import\n\n1. Attach **Payload Test Agent Bearer** on the Webhook node.\n2. Attach **OpenAI account** on **OpenAI Chat Model**.\n3. Optional: attach **Target Payload read API key** on **Payload_Read**, then replace the URL host with the target Payload site origin. Use a read-only API key user scoped to approved collections.\n4. Keep **Calculator** and **Payload_Read**, or add more tool sub-nodes.\n5. Publish the workflow, sync into Payload, then run **Set up test agent**.\n\nPayload sends `input.text`, `sessionID`, and `requestID` in the webhook body. **Map Harness Input** normalizes those fields for the agent. **Build Harness Response** shapes the JSON Payload expects.",
+        "height": 340,
+        "width": 500,
         "color": 5
       },
       "id": "s1s1s1s1-8888-4888-8888-888888888801",
@@ -247,6 +294,17 @@
       ]
     },
     "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload_Read": {
       "ai_tool": [
         [
           {

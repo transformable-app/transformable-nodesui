@@ -158,7 +158,7 @@ NodesUI rejects the write if the output target does not match the binding, if th
 
 `relationshipResolvers` convert generated relationship values into target-site document IDs before the draft is written. In the example above, a generated `"category": "news"` value is resolved by querying the target Payload site for one `categories` document where `slug` equals `news`; the draft receives that remote document ID.
 
-Each known-site remote write attempt also appends a `remote-draft-audits` record with the run, target site, target envelope, binding, request document, result or error, and review URLs when available. Audit records are Admin-readable and append-only.
+Each known-site remote draft write attempt appends a `remote-draft-audits` record with the run, target site, target envelope, binding, request document, result or error, and review URLs when available. When a generated draft is approved, NodesUI resolves a Payload approval with `approvalType: "remote-draft-publish"`, publishes the remote draft, and appends a second `remote-draft-audits` record with `operation: "publish"`. Audit records are Admin-readable and append-only.
 
 Media requests can reference either a direct `sourceURL` or an `artifactID`:
 

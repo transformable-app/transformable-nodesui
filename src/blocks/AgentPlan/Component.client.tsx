@@ -442,7 +442,7 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
                   <span className={cn('rounded-full border px-2 py-1 text-center text-xs font-medium', getTaskStatusClass(task.status))}>
                     {task.status || 'pending'}
                   </span>
-                  {task.status === 'needs-approval' ? (
+                  {task.status === 'needs-approval' && !task.pendingApproval ? (
                     <Button
                       disabled={approvingTaskID === (task.taskID || task.id)}
                       onClick={() => approveTask(task)}

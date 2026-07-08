@@ -4,16 +4,18 @@ export type SampleN8nWorkflow = {
   endpointPath: string
   filename: string
   label: string
+  optionalCredentials?: string[]
 }
 
 /** Default sample for the dashboard test-agent preset and Agent Chat block smoke tests. */
 export const DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW: SampleN8nWorkflow = {
   category: 'agent-chat',
   description:
-    'Webhook + AI Agent workflow for the Agent Chat block. Includes OpenAI Chat Model, memory, a placeholder Calculator tool, and harness response shaping.',
+    'Webhook + AI Agent workflow for the Agent Chat block. Includes OpenAI Chat Model, memory, Calculator, a direct Payload API read tool, and harness response shaping.',
   endpointPath: '/webhook/test-agent',
   filename: 'test-agent-webhook.json',
   label: 'Agent Chat (Webhook)',
+  optionalCredentials: ['Target Payload read API key'],
 }
 
 /** @deprecated Use DEFAULT_AGENT_CHAT_SAMPLE_WORKFLOW */

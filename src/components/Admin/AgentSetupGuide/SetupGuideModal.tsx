@@ -145,6 +145,11 @@ export const AgentSetupGuideModal = ({
                     <strong>{workflow.label}</strong>
                     <span className="agentSetupGuide__samples-path">{workflow.endpointPath}</span>
                     <p>{workflow.description}</p>
+                    {workflow.optionalCredentials?.length ? (
+                      <p>
+                        Optional credentials: <code>{workflow.optionalCredentials.join(', ')}</code>
+                      </p>
+                    ) : null}
                   </div>
                   <div className="agentSetupGuide__samples-actions">
                     <a

@@ -4,7 +4,9 @@ import path from 'path'
 import { APIError, type PayloadRequest } from 'payload'
 
 import { findRemoteDocumentID, uploadMediaDocument, writeDraftDocument } from '@/payloadSites/client'
-import type { AgentArtifact, Media, PayloadSite, RemoteDraftAudit } from '@/payload-types'
+import type { AgentArtifact, Media, PayloadSite } from '@/payload-types'
+
+import { createRemoteDraftAudit } from './remoteDraftAudit'
 
 type CMSDraftTarget = {
   collection: string
@@ -828,28 +830,6 @@ const resolveMediaBlob = ({
   }
 
   return readLocalMediaBlob({ mediaRequest, site, source })
-}
-
-const createRemoteDraftAudit = async ({
-  audit,
-  req,
-}: {
-  audit: Partial<RemoteDraftAudit> & {
-    attemptedAt: string
-    status: 'attempted' | 'failed' | 'succeeded'
-  }
-  req: PayloadRequest
-}) => {
-  try {
-    await req.payload.create({
-      collection: 'remote-draft-audits',
-      data: audit as never,
-      overrideAccess: true,
-      req,
-    })
-  } catch {
-    // Audit writes must never mask the remote write result recorded on the run.
-  }
 }
 
 const resolveMediaRequests = async ({

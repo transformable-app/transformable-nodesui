@@ -26,6 +26,7 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo()
   const [checking, setChecking] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [accepting, setAccepting] = useState(false)
   const [lastResult, setLastResult] = useState<string | null>(null)
 
   const statuses = useFormFields(([fields]) => ({
@@ -35,14 +36,16 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
   }))
 
   const runAction = useCallback(
-    async (action: 'check-companion-plugin' | 'sync-schema-profile') => {
+    async (action: 'accept-schema-profile' | 'check-companion-plugin' | 'sync-schema-profile') => {
       if (!id) {
         toast.error('Save this Payload Site before running setup actions.')
         return
       }
 
       const isSync = action === 'sync-schema-profile'
-      if (isSync) setSyncing(true)
+      const isAccept = action === 'accept-schema-profile'
+      if (isAccept) setAccepting(true)
+      else if (isSync) setSyncing(true)
       else setChecking(true)
 
       try {
@@ -60,7 +63,9 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
         const hash = data.profileHash || data.payloadSite?.schemaProfileHash
         const message = isSync
           ? `Schema profile ${status || 'synced'}${hash ? ` (${hash.slice(0, 8)})` : ''}.`
-          : 'Companion plugin check completed.'
+          : isAccept
+            ? `Schema profile ${status || 'accepted'}. Review complete; enable write-back separately when ready.`
+            : 'Companion plugin check completed.'
 
         setLastResult(message)
         toast.success(message)
@@ -69,7 +74,8 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
         setLastResult(message)
         toast.error(message)
       } finally {
-        if (isSync) setSyncing(false)
+        if (isAccept) setAccepting(false)
+        else if (isSync) setSyncing(false)
         else setChecking(false)
       }
     },
@@ -85,7 +91,7 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
       <div className="payloadSiteActions__actions">
         <button
           className="payloadSiteActions__button"
-          disabled={checking || syncing}
+          disabled={checking || syncing || accepting}
           onClick={() => runAction('check-companion-plugin')}
           type="button"
         >
@@ -93,11 +99,19 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
         </button>
         <button
           className="payloadSiteActions__button"
-          disabled={checking || syncing}
+          disabled={checking || syncing || accepting}
           onClick={() => runAction('sync-schema-profile')}
           type="button"
         >
           {syncing ? 'Syncing schema profile...' : 'Sync schema profile'}
+        </button>
+        <button
+          className="payloadSiteActions__button"
+          disabled={checking || syncing || accepting || statuses.schemaProfileStatus !== 'stale'}
+          onClick={() => runAction('accept-schema-profile')}
+          type="button"
+        >
+          {accepting ? 'Accepting profile...' : 'Accept schema profile'}
         </button>
       </div>
       <span className="payloadSiteActions__meta">

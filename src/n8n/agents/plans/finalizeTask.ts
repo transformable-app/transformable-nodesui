@@ -8,6 +8,7 @@ import {
   recordCMSDraftWriteFailure,
   writeCMSDraftFromTaskOutput,
 } from './cmsDraftWriter'
+import { createRemoteDraftPublishApproval } from './remoteDraftApproval'
 import { isPlanTerminal, type RunnablePlanTask } from './selectRunnableTasks'
 
 const asPayloadJSON = (value: unknown) =>
@@ -100,6 +101,10 @@ export const finalizePlanTask = async ({
       await writeCMSDraftFromTaskOutput({
         outputBinding: existingTask.outputBinding,
         output: outputValue,
+        req,
+        runID,
+      })
+      await createRemoteDraftPublishApproval({
         req,
         runID,
       })
@@ -204,6 +209,10 @@ export const finalizePlanTaskFromRun = async ({
       await writeCMSDraftFromTaskOutput({
         outputBinding: existingTask.outputBinding,
         output: outputValue,
+        req: req as PayloadRequest,
+        runID: run.id,
+      })
+      await createRemoteDraftPublishApproval({
         req: req as PayloadRequest,
         runID: run.id,
       })

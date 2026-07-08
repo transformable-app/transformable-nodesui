@@ -8,6 +8,8 @@ export type PayloadSiteConfig = {
   apiKeyAuthCollection?: string | null
   apiKeySecretReference?: string | null
   baseURL?: string | null
+  n8nReadAPIKeySecretReference?: string | null
+  readableCollections?: string[] | null
   schemaProfileEndpoint?: string | null
 }
 

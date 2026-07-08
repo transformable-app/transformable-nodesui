@@ -49,6 +49,13 @@ export const AgentApprovals: CollectionConfig = {
       options: ['pending', 'consuming', 'approved', 'rejected', 'expired', 'failed'],
       required: true,
     },
+    {
+      name: 'approvalType',
+      type: 'select',
+      defaultValue: 'n8n-resume',
+      options: ['n8n-resume', 'remote-draft-publish'],
+      required: true,
+    },
     { name: 'prompt', type: 'textarea' },
     {
       name: 'resumeURL',

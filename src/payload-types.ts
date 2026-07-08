@@ -1075,6 +1075,7 @@ export interface AgentApproval {
   session: string | AgentSession;
   user: string | User;
   status: 'pending' | 'consuming' | 'approved' | 'rejected' | 'expired' | 'failed';
+  approvalType: 'n8n-resume' | 'remote-draft-publish';
   prompt?: string | null;
   resumeURL?: string | null;
   responsePayload?:
@@ -1411,6 +1412,10 @@ export interface PayloadSite {
    * Environment variable name containing the target Payload API key.
    */
   apiKeySecretReference: string;
+  /**
+   * Optional n8n credential name or secret reference for a separate read-only Payload API key on this target site.
+   */
+  n8nReadAPIKeySecretReference?: string | null;
   schemaProfileEndpoint: string;
   companionPluginStatus: 'missing' | 'connected' | 'stale' | 'error';
   companionPluginLastCheckedAt?: string | null;
@@ -1442,6 +1447,10 @@ export interface PayloadSite {
    * Writable target-site collections. Generated output is still validated against the schema profile.
    */
   allowedCollections: string[];
+  /**
+   * Target-site collections that n8n agents may read directly with a scoped read-only Payload API key.
+   */
+  readableCollections?: string[] | null;
   /**
    * NodesUI roles allowed to generate drafts for this site.
    */
@@ -1552,7 +1561,7 @@ export interface RemoteDraftAudit {
   planTask?: (string | null) | AgentPlanTask;
   payloadSite?: (string | null) | PayloadSite;
   collection?: string | null;
-  operation?: ('create' | 'update') | null;
+  operation?: ('create' | 'update' | 'publish') | null;
   status: 'attempted' | 'succeeded' | 'failed';
   remoteDocumentID?: string | null;
   remoteVersionID?: string | null;
@@ -2336,6 +2345,7 @@ export interface AgentApprovalsSelect<T extends boolean = true> {
   session?: T;
   user?: T;
   status?: T;
+  approvalType?: T;
   prompt?: T;
   resumeURL?: T;
   responsePayload?: T;
@@ -2629,6 +2639,7 @@ export interface PayloadSitesSelect<T extends boolean = true> {
   adminURL?: T;
   apiKeyAuthCollection?: T;
   apiKeySecretReference?: T;
+  n8nReadAPIKeySecretReference?: T;
   schemaProfileEndpoint?: T;
   companionPluginStatus?: T;
   companionPluginLastCheckedAt?: T;
@@ -2641,6 +2652,7 @@ export interface PayloadSitesSelect<T extends boolean = true> {
   schemaProfile?: T;
   capabilities?: T;
   allowedCollections?: T;
+  readableCollections?: T;
   allowedRoles?: T;
   fieldAllowlists?:
     | T

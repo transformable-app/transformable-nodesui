@@ -112,6 +112,21 @@ export const PayloadSites: CollectionConfig = {
       },
     },
     {
+      name: 'n8nReadAPIKeySecretReference',
+      type: 'text',
+      access: {
+        read: adminFieldAccess,
+        update: adminFieldAccess,
+      },
+      admin: {
+        components: {
+          Field: '@/components/Admin/SecretTextField#SecretTextField',
+        },
+        description:
+          'Optional n8n credential name or secret reference for a separate read-only Payload API key on this target site.',
+      },
+    },
+    {
       name: 'schemaProfileEndpoint',
       type: 'text',
       defaultValue: '/api/nodesui/schema-profile',
@@ -202,6 +217,16 @@ export const PayloadSites: CollectionConfig = {
       required: true,
       admin: {
         description: 'Writable target-site collections. Generated output is still validated against the schema profile.',
+      },
+    },
+    {
+      name: 'readableCollections',
+      type: 'text',
+      hasMany: true,
+      defaultValue: ['pages', 'posts', 'media'],
+      admin: {
+        description:
+          'Target-site collections that n8n agents may read directly with a scoped read-only Payload API key.',
       },
     },
     {

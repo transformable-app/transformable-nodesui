@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { finalizePlanTask } from '@/n8n/agents/plans/finalizeTask'
 import { recordCMSDraftWriteFailure, writeCMSDraftFromTaskOutput } from '@/n8n/agents/plans/cmsDraftWriter'
+import { createRemoteDraftPublishApproval } from '@/n8n/agents/plans/remoteDraftApproval'
 
 vi.mock('@/n8n/agents/plans/cmsDraftWriter', async () => {
   const actual = await vi.importActual<typeof import('@/n8n/agents/plans/cmsDraftWriter')>(
@@ -14,8 +15,13 @@ vi.mock('@/n8n/agents/plans/cmsDraftWriter', async () => {
   }
 })
 
+vi.mock('@/n8n/agents/plans/remoteDraftApproval', () => ({
+  createRemoteDraftPublishApproval: vi.fn(),
+}))
+
 const mockedWriteCMSDraftFromTaskOutput = vi.mocked(writeCMSDraftFromTaskOutput)
 const mockedRecordCMSDraftWriteFailure = vi.mocked(recordCMSDraftWriteFailure)
+const mockedCreateRemoteDraftPublishApproval = vi.mocked(createRemoteDraftPublishApproval)
 
 const makeReq = () => ({
   payload: {
@@ -37,6 +43,7 @@ const makeReq = () => ({
 describe('cms-draft finalization', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockedCreateRemoteDraftPublishApproval.mockResolvedValue({ id: 'approval-1' } as never)
     mockedRecordCMSDraftWriteFailure.mockResolvedValue({} as never)
     mockedWriteCMSDraftFromTaskOutput.mockResolvedValue({ status: 'created' } as never)
   })
@@ -59,6 +66,10 @@ describe('cms-draft finalization', () => {
     expect(mockedWriteCMSDraftFromTaskOutput).toHaveBeenCalledWith({
       outputBinding: { collection: 'pages', payloadSite: 'primary' },
       output: response.data,
+      req,
+      runID: 'run-1',
+    })
+    expect(mockedCreateRemoteDraftPublishApproval).toHaveBeenCalledWith({
       req,
       runID: 'run-1',
     })

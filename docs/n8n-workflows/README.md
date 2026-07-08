@@ -6,7 +6,7 @@ Importable n8n workflow JSON files for testing the Payload agent harness. They m
 
 | File | Production path | Purpose |
 | --- | --- | --- |
-| [test-agent-webhook.json](./test-agent-webhook.json) | `/webhook/test-agent` | Canonical Agent Chat smoke test. Webhook → AI Agent (OpenAI Chat Model, memory, Calculator tool) → harness JSON response. |
+| [test-agent-webhook.json](./test-agent-webhook.json) | `/webhook/test-agent` | Canonical Agent Chat smoke test. Webhook → AI Agent (OpenAI Chat Model, memory, Calculator tool, direct Payload API read tool) → harness JSON response. |
 | [test-agent-echo-webhook.json](./test-agent-echo-webhook.json) | `/webhook/test-agent-echo` | Returns `Echo: <user text>` from the harness `input.text` field. |
 | [test-agent-async-waiting.json](./test-agent-async-waiting.json) | `/webhook/test-agent-async` | Returns `status: "waiting"` only. Use with a manual Payload callback curl. |
 | [test-agent-async-callback.json](./test-agent-async-callback.json) | `/webhook/test-agent-async-callback` | Returns `waiting`, then POSTs a completion callback to Payload in the same execution. |
@@ -54,7 +54,21 @@ Used by the **OpenAI Chat Model** sub-node on [test-agent-webhook.json](./test-a
 | Type | OpenAI API |
 | API Key | Your OpenAI key |
 
-After import, reconnect the credential on **OpenAI Chat Model**. Swap the model, system prompt, memory settings, or replace **Calculator** with your own tool sub-nodes as needed.
+After import, reconnect the credential on **OpenAI Chat Model**. Swap the model, system prompt, memory settings, or adjust the included **Calculator** and **Payload_Read** tool sub-nodes as needed.
+
+### Target Payload read API key (optional Payload read tools)
+
+Used by the included **Payload_Read** AI tool node, which reads configured target Payload site collections directly from n8n.
+
+| Field | Value |
+| --- | --- |
+| Type | Header Auth |
+| Name | `Authorization` |
+| Value | `<auth collection> API-Key <target site read-only API key>` |
+
+Example: if the target site authenticates API keys through `users`, set the credential value to `users API-Key payload-site-read-key`.
+
+Use a dedicated read-only target-site user/API key for n8n. Do not reuse the write-back API key that NodesUI uses for draft creation, media upload, or publishing.
 
 ### Payload Callback Secret (async callback workflow only)
 
@@ -121,7 +135,7 @@ The workflow can participate in Payload-mediated HITL approval. If the task inpu
 
 Payload stores the resume URL on an `agent-approvals` record. The browser approves through `POST /api/agent-approvals/:id/resolve`; Payload then posts to n8n server-side, so the n8n resume URL is never exposed to the user.
 
-For the generated page flow, approval happens after the target-site draft is created. AgentPlanBlock submits the task without pre-write approval, n8n returns a `cms-draft` envelope, NodesUI creates the draft in the target Payload site, then the task pauses as `needs-approval` for review. Approving the task publishes that remote draft in the target Payload site, marks the run's `remoteDraft.status` as `published`, and completes the task without rerunning n8n or creating a duplicate draft.
+For the generated page flow, approval happens after the target-site draft is created. AgentPlanBlock submits the task without pre-write approval, n8n returns a `cms-draft` envelope, NodesUI creates the draft in the target Payload site, then NodesUI creates a pending Payload approval with `approvalType: "remote-draft-publish"`. Resolving that approval publishes the remote draft in the target Payload site, records a `remote-draft-audits` publish entry, marks the run's `remoteDraft.status` as `published`, and completes the task without rerunning n8n or creating a duplicate draft.
 
 For `cms-draft` tasks, the workflow returns:
 
@@ -193,6 +207,6 @@ Use **Set up test agent** for the first row only. For the others, create an **Ag
 
 ## Notes
 
-- [test-agent-webhook.json](./test-agent-webhook.json) ships the key Agent Chat nodes (Webhook, input mapping, AI Agent, chat model, memory, placeholder tool, response shaping). Other samples stay minimal on purpose.
+- [test-agent-webhook.json](./test-agent-webhook.json) ships the key Agent Chat nodes (Webhook, input mapping, AI Agent, chat model, memory, Calculator tool, Payload_Read tool, response shaping). Configure `Payload_Read` with a scoped read-only target-site credential when an agent needs to inspect configured Payload site collections. Other samples stay minimal on purpose.
 - Node `typeVersion` values target recent n8n releases; n8n may prompt to upgrade nodes after import.
 - Chat Trigger samples are not included yet; the harness also supports `chat-trigger` transport with a published Chat Trigger workflow (see [agent-harness-user-guide.md](../agent-harness-user-guide.md)).

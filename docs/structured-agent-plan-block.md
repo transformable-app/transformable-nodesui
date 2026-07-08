@@ -259,7 +259,7 @@ The callback route should continue to correlate by `requestID`; plan/task state 
 
 ## External Payload Site Targets
 
-Generated CMS content should target a configured Payload website, not implicitly write into the current NodesUI install. NodesUI is the control plane for agents; target Payload websites remain the content systems of record.
+Generated CMS content should target a configured Payload website, not implicitly write into the current NodesUI install. NodesUI is the control plane for plans, write-back validation, approvals, and audit; target Payload websites remain the content systems of record. n8n workflows may read target Payload sites directly through those sites' Payload REST APIs when they use scoped, read-only Payload API key credentials configured in n8n.
 
 Add a `payload-sites` collection or equivalent configuration surface with:
 
@@ -268,8 +268,10 @@ Add a `payload-sites` collection or equivalent configuration surface with:
 - `adminURL`: optional editor/admin link root for review links
 - `apiKeyAuthCollection`: auth collection slug for Payload API key authentication, defaulting to `users`
 - `apiKeySecretReference`: environment or secret-manager reference for that site's Payload API key, never the API key value itself
+- `n8nReadAPIKeySecretReference`: optional reference/name for a separate read-only target-site API key credential managed in n8n
 - `companionPluginStatus`: `missing`, `connected`, `stale`, or `error`
 - `allowedCollections`: allowlist of writable collection slugs, initially focused on `pages` and `media`
+- `readableCollections`: allowlist of collection slugs that n8n agents may read directly through the target site's Payload API
 - `capabilities`: discovered from the companion plugin, including support for drafts, versions, uploads, locales, tenants, block slugs, and required plugins
 - `schemaProfileEndpoint`: relative API path exposed by the companion plugin, defaulting to `/api/nodesui/schema-profile`
 - `schemaProfile`, `schemaProfileHash`, `schemaProfileSyncedAt`, and `schemaProfileStatus`
@@ -278,6 +280,38 @@ Add a `payload-sites` collection or equivalent configuration surface with:
 - `mediaPolicy`: allowed MIME types, size caps, image generation/import behavior, and retention rules for temporary artifacts
 
 NodesUI should never assume the target schema matches its own `pages` collection. The target site must have the NodesUI companion plugin installed and connected before a plan can write drafts.
+
+## Direct Payload API Reads From n8n
+
+n8n agents may use normal HTTP Request or AI tool nodes to read approved target Payload site collections directly. This is intentionally different from write-back:
+
+- Reads may happen inside n8n using the target site's Payload REST API and a read-only Payload API key credential stored in n8n.
+- Writes still return an intent envelope to NodesUI. NodesUI validates generated output, writes drafts through its server-side Payload API client, records provenance, and requires explicit approval before publish.
+- The target Payload site is responsible for enforcing collection and field access for the read-only API key user. Use a dedicated user/API key, not the same credential used for draft writes.
+- n8n workflow prompts and tool descriptions must constrain reads to the site's `readableCollections` and avoid broad, user-controlled queries.
+- Direct n8n reads do not create NodesUI per-query audit records by default. The audit source is the n8n execution plus any logs on the target Payload site. If per-query audit becomes a requirement, add a NodesUI-mediated read endpoint later.
+
+Recommended direct-read tool contract for n8n:
+
+```ts
+type PayloadSiteReadToolInput = {
+  collection: string
+  id?: string
+  where?: Record<string, unknown>
+  select?: Record<string, true>
+  depth?: number
+  limit?: number
+  sort?: string
+}
+```
+
+Recommended caps for n8n tools:
+
+- `depth`: default `0`, hard cap `2`
+- `limit`: default `10`, hard cap `50`
+- `select`: prefer explicit fields instead of full documents
+- `where`: allow simple read-oriented filters only; avoid arbitrary agent-generated operators until the workflow is trusted
+- API key: read-only, collection-restricted, and separate from write-back credentials
 
 ## Schema Profile Sync
 
@@ -304,7 +338,7 @@ Schema profile sync should be explicit or scheduled, not performed on every gene
 
 ## Remote CMS Draft Contract
 
-For `cms-draft` tasks, n8n returns an intent envelope. NodesUI validates the envelope, resolves artifacts, and calls the selected target Payload API using the target site's configured Payload API key. Agents never receive direct API keys or write freely to any collection.
+For `cms-draft` tasks, n8n returns an intent envelope. NodesUI validates the envelope, resolves artifacts, and calls the selected target Payload API using the target site's configured write-back Payload API key. Agents may hold a separate read-only target-site API credential in n8n for retrieval, but they should not hold write-capable credentials or write freely to any collection.
 
 ```ts
 type CMSDraftOutput = {
@@ -373,7 +407,8 @@ Remote Payload API calls are not Local API calls, so `overrideAccess` does not a
 - Treat n8n output as untrusted. Render text safely and validate structured output before using it.
 - Use drafts and explicit approval for CMS write-back. NodesUI writes generated content as a target-site draft first; explicit approval publishes that remote draft in the target Payload site.
 - Do not write generated CMS content into the current NodesUI install unless it is explicitly registered as a `payload-sites` target and passes the same API-client path as every other site.
-- Keep target Payload API keys server-side and scoped per site. Use a restricted target-site API key user that can create/update drafts and upload media only for allowed collections.
+- Keep write-capable target Payload API keys server-side in NodesUI and scoped per site. Use a restricted target-site API key user that can create/update drafts and upload media only for allowed collections.
+- If n8n reads target Payload APIs directly, use a separate read-only target-site API key credential in n8n. Restrict that user at the target Payload site to approved collections and fields wherever possible.
 - Validate target site, collection, block type, field paths, locale, tenant, remote document ID, media references, and file metadata before remote writes.
 - Record every remote write attempt with plan, task, run, target site, remote collection, remote document/version IDs, actor, timestamp, status, and redacted error details.
 - Enforce the recommended defaults and hard caps for task count, input size, shared context, output previews, attempts, concurrent tasks, artifact metadata, and total plan runtime.
@@ -386,7 +421,7 @@ Remote Payload API calls are not Local API calls, so `overrideAccess` does not a
 
 - Add `agent-plans` and `agent-plan-tasks` collection configs.
 - Add plan input schema, defaults, dependency validation, optional `payloadSite` targeting, and redaction helpers.
-- Add `payload-sites` configuration with role access, trusted base URL, Payload API key secret reference, auth collection slug, companion plugin status, collection allowlists, media policy, and saved schema profile fields.
+- Add `payload-sites` configuration with role access, trusted base URL, write-back Payload API key secret reference, optional n8n read API key credential reference/name, auth collection slug, companion plugin status, writable/readable collection allowlists, media policy, and saved schema profile fields.
 - Add schema-profile sync and compatibility checks through the required target-site companion plugin.
 - Add validate/start endpoints.
 - Define sample workflow metadata for plan-capable workflows so the setup guide can recommend the right n8n import later.
@@ -413,6 +448,7 @@ Exit: a plan with multiple dependent tasks can run to completion through normal 
 - Add Admin controls on `payload-sites` for "Check companion plugin", "Sync schema profile", "Review profile changes", and "Enable write-back".
 - Show task state, dependency state, attempts, latest output preview, and linked run/execution details.
 - Add a setup guide modal when the selected plan agent/workflow is missing setup, sync, credentials, sample import, or response-shape confirmation. Reuse the current agent setup guide modal patterns and sample workflow download API where practical.
+- Include n8n direct Payload API read setup in the guide: create a read-only target-site Payload API key user, store the credential in n8n, and attach it to the agent's Payload read tool node.
 - Add at least one importable plan sample workflow under `docs/n8n-workflows/` and expose it through the sample workflow listing.
 - Add polling or existing stream-compatible refresh behavior.
 - Document the manual test flow, setup guide behavior, and plan sample import path in `agent-harness-testing.md`.
@@ -448,6 +484,7 @@ Exit: plans can grow through explicit approval without letting the agent silentl
 - Manual mode should approve only selected task transitions. A manual plan can still compute which tasks are ready, but dispatch pauses only at task boundaries marked by policy, risk, write-back behavior, or explicit `requiresApproval`. Users should not have to click start for every low-risk task.
 - Large files, generated documents, exports, or media should become artifacts linked from the task/run instead of being copied into `sharedContext`.
 - CMS draft generation targets configured external Payload sites through their Payload APIs. The current NodesUI install is only a target if it is explicitly registered as a site and uses the same remote-client flow.
+- n8n agents may read approved target Payload site collections directly through those sites' Payload APIs using scoped, read-only API key credentials stored in n8n. NodesUI does not need to proxy those reads unless per-query NodesUI audit or runtime policy enforcement becomes required.
 - Target Payload site schema, blocks, fields, drafts, media, locale, and tenant behavior must be represented by per-site capabilities/schema profiles. Do not assume NodesUI's local `pages` or `media` schema matches a target website.
 - The first dashboard UI should use a small curated form for the initial `AgentPlanInput` shape. JSON Schema remains the server-side validation source of truth, but the first UX should optimize for this exact plan workflow instead of exposing a generic generated form as the primary interface.
 - Controlled task expansion belongs in a future phase after fixed-block plan execution is reliable.

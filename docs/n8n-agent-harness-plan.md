@@ -343,12 +343,13 @@ Move from user-initiated sends to system-initiated invocations.
 
 Let agents produce Payload content, not just chat text. This is the highest-leverage extension for a Payload project, but NodesUI should act as the agent control plane for many Payload websites rather than assuming generated content belongs in the current NodesUI install.
 
-- Add a `payload-sites` registry for external Payload websites with trusted API base URL, admin URL, Payload API key secret reference, auth collection slug, allowed collections, field/block allowlists, media policy, draft/version capabilities, locale/tenant support, and role access.
+- Add a `payload-sites` registry for external Payload websites with trusted API base URL, admin URL, write-back Payload API key secret reference, optional n8n read API key credential reference/name, auth collection slug, writable/readable collection allowlists, field/block allowlists, media policy, draft/version capabilities, locale/tenant support, and role access.
 - Require the NodesUI companion plugin on each target Payload website before enabling CMS write-back. NodesUI syncs target-site schema profiles only through the plugin's sanitized API endpoint; GraphQL introspection and manual schema profiles are not supported write-back paths.
+- Allow n8n agents to read approved target Payload site collections directly through those sites' Payload REST APIs. Use a separate read-only target-site Payload API key credential stored in n8n, scoped by the target site's own access control. This is acceptable for retrieval/tool use; NodesUI mediation is not required unless per-query NodesUI audit or runtime policy enforcement becomes a product requirement.
 - Agents create or update target documents as drafts on the selected Payload website through that site's Payload API, using Payload's built-in API key authentication. The current NodesUI install is only a target if it is explicitly registered like any other Payload site.
 - Add an `outputBinding` on the agent or plan describing the target Payload site, collection, schema profile, and field mapping. NodesUI validates the generated document against that binding before any remote API call.
 - For media assets required by generated blocks, store local `agent-artifacts` for provenance, then upload the final asset to the target site's media/upload collection so generated block fields reference target-site media IDs.
-- Guardrails: drafts only (never auto-publish), per-site collection and field allowlists, block-type allowlists, target-site API key isolation, SSRF-safe URL building for target API calls and artifact fetch-back, and an audit record linking each generated remote draft to its `agent-run`.
+- Guardrails: drafts only (never auto-publish), per-site collection and field allowlists, block-type allowlists, separate read-only n8n credentials and write-capable NodesUI credentials, target-site API key isolation, SSRF-safe URL building for NodesUI write-back calls and artifact fetch-back, and an audit record linking each generated remote draft to its `agent-run`.
 
 ### 5. Multi-agent orchestration / pipelines
 

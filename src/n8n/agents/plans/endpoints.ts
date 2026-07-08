@@ -2,10 +2,9 @@ import { APIError, type Endpoint } from 'payload'
 
 import { cancelAgentRun } from '@/n8n/agents/invokeAgent'
 import { AgentHarnessError } from '@/n8n/agents/types'
-import { publishDraftDocument } from '@/payloadSites/client'
 
 import { createAgentPlan } from './createPlan'
-import { refreshPlanStatus } from './finalizeTask'
+import { createRemoteDraftPublishApproval } from './remoteDraftApproval'
 import { runPlanLoop } from './runPlanLoop'
 import { validateAgentPlanInput } from './validatePlan'
 
@@ -277,55 +276,8 @@ export const agentPlanCollectionEndpoints: Endpoint[] = [
           if (!latestRunID) {
             throw new AgentHarnessError('input-validation', 'Remote draft is missing its agent run.', 400)
           }
-          const payloadSiteID = getRelationshipID(remoteDraft.payloadSite)
-          if (!payloadSiteID) {
-            throw new AgentHarnessError('input-validation', 'Remote draft is missing its target Payload site.', 400)
-          }
-          if (typeof remoteDraft.collection !== 'string' || !remoteDraft.collection) {
-            throw new AgentHarnessError('input-validation', 'Remote draft is missing its target collection.', 400)
-          }
-          if (typeof remoteDraft.documentID !== 'string' || !remoteDraft.documentID) {
-            throw new AgentHarnessError('input-validation', 'Remote draft is missing its target document.', 400)
-          }
-
-          const payloadSite = await req.payload.findByID({
-            collection: 'payload-sites',
-            depth: 0,
-            id: payloadSiteID,
-            overrideAccess: true,
-            req,
-          })
-          const publishResponse = await publishDraftDocument({
-            collection: remoteDraft.collection,
-            id: remoteDraft.documentID,
-            site: payloadSite,
-          })
-          await req.payload.update({
-            collection: 'agent-runs',
-            data: {
-              remoteDraft: {
-                ...remoteDraft,
-                lastSyncedAt: new Date().toISOString(),
-                response: publishResponse,
-                status: 'published',
-              },
-            },
-            id: latestRunID,
-            overrideAccess: true,
-            req,
-          })
-          const updatedTask = await req.payload.update({
-            collection: 'agent-plan-tasks',
-            data: {
-              finishedAt: new Date().toISOString(),
-              status: 'succeeded',
-            },
-            id: task.id,
-            overrideAccess: true,
-            req,
-          })
-          const plan = await refreshPlanStatus({ planID, req })
-          return Response.json({ ok: true, plan, task: updatedTask })
+          const approval = await createRemoteDraftPublishApproval({ req, runID: latestRunID })
+          return Response.json({ approval, ok: true, task })
         }
 
         const updatedTask = await req.payload.update({

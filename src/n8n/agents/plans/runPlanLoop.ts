@@ -103,6 +103,7 @@ const createPlanApprovalFromResponse = async ({
     collection: 'agent-approvals',
     data: {
       agent: agentID,
+      approvalType: 'n8n-resume',
       expiresAt: response.approval.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       prompt: response.approval.prompt || 'This plan task is waiting for approval.',
       resumeURL,

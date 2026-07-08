@@ -24,7 +24,7 @@ export const RemoteDraftAudits: CollectionConfig = {
     { name: 'planTask', type: 'relationship', relationTo: 'agent-plan-tasks', index: true },
     { name: 'payloadSite', type: 'relationship', relationTo: 'payload-sites', index: true },
     { name: 'collection', type: 'text', index: true },
-    { name: 'operation', type: 'select', options: ['create', 'update'] },
+    { name: 'operation', type: 'select', options: ['create', 'update', 'publish'] },
     { name: 'status', type: 'select', options: ['attempted', 'succeeded', 'failed'], required: true },
     { name: 'remoteDocumentID', type: 'text' },
     { name: 'remoteVersionID', type: 'text' },

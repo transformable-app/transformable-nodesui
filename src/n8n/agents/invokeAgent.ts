@@ -5,6 +5,7 @@ import { assertSameServerURL } from './buildEndpoint'
 import { getRelationshipID, resolveAgentBySlug } from './resolveAgent'
 import { invokeN8nAgent, invokeN8nAgentStream, stopN8nExecution } from './adapters'
 import { finalizePlanTaskFromRun } from './plans/finalizeTask'
+import { resolveRemoteDraftPublishApproval } from './plans/remoteDraftApproval'
 import { redactValue, toPreview } from './redact'
 import { AgentHarnessError, type AgentRequest, type AgentStreamEvent } from './types'
 
@@ -1412,6 +1413,38 @@ export const resolveAgentApproval = async ({
     overrideAccess: true,
   })
 
+  if (approval.approvalType === 'remote-draft-publish') {
+    try {
+      await resolveRemoteDraftPublishApproval({
+        approval,
+        approved,
+        req,
+      })
+    } catch (error) {
+      await req.payload.update({
+        collection: 'agent-approvals',
+        data: {
+          status: 'failed',
+        },
+        id: approvalID,
+        overrideAccess: true,
+      })
+      throw error
+    }
+
+    return req.payload.update({
+      collection: 'agent-approvals',
+      data: {
+        consumedAt: new Date().toISOString(),
+        responsePayload: asPayloadJSON(responsePayload),
+        resolvedBy: req.user.id,
+        status: approved ? 'approved' : 'rejected',
+      },
+      id: approvalID,
+      overrideAccess: true,
+    })
+  }
+
   if (!approval?.resumeURL) {
     throw new AgentHarnessError('input-validation', 'Approval resume URL is not configured.', 500)
   }
@@ -1565,6 +1598,7 @@ export const updateRunFromCallback = async (
         collection: 'agent-approvals',
         data: {
           agent: agentID,
+          approvalType: 'n8n-resume',
           expiresAt,
           prompt:
             typeof approval.prompt === 'string'
