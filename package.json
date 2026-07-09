@@ -80,7 +80,7 @@
     "@types/react": "19.2.4",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "4.5.2",
-    "autoprefixer": "^10.4.24",
+    "autoprefixer": "^10.5.0",
     "copyfiles": "^2.4.1",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.2.9",
