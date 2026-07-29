@@ -1,6 +1,6 @@
 {
   "name": "transformable-nodesui",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Dashboard-focused Payload CMS app for monitoring n8n instances",
   "license": "MIT",
   "source": "https://github.com/transformable-app/transformable-nodesui",
