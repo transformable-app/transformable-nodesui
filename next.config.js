@@ -8,6 +8,11 @@ const NEXT_PUBLIC_SERVER_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // Sharp dynamically loads its platform-specific native addon and libvips files.
+  // Include them in the standalone trace so Alpine production images contain both.
+  outputFileTracingIncludes: {
+    '/*': ['node_modules/sharp/**/*', 'node_modules/@img/**/*'],
+  },
   images: {
     // Allow local media URLs (e.g. /api/media, /media on same host)
     localPatterns: [
