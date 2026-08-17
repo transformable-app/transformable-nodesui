@@ -1,0 +1,37 @@
+packages:
+  - '.'
+
+allowBuilds:
+  '@sentry/cli': true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+
+overrides:
+  file-type: '>=21.3.1'
+  fast-xml-parser: '>=5.7.0'
+  rollup: '>=4.59.0'
+  esbuild: '>=0.28.1'
+  '@babel/core': '>=7.29.6 <8'
+  '@opentelemetry/core': '>=2.8.0'
+  eslint>ajv: '>=6.14.0 <7'
+  minimatch: '>=10.2.3'
+  undici: '>=7.29.0 <8'
+  flatted: '>=3.4.2'
+  picomatch: '>=4.0.4'
+  brace-expansion: '5.0.9'
+  ws: '>=8.21.0'
+  nodemailer: '>=8.0.5'
+  nanoid: '>=3.3.17 <4'
+  uuid: '>=14.0.0'
+  yaml: '>=1.10.3'
+  js-yaml: '>=4.3.0'
+  'payload>ajv': '>=8.18.0'
+  fast-uri: '>=4.1.2'
+  dompurify: '3.4.13'
+  immutable: '>=5.1.8'
+  lodash: '>=4.18.0'
+  serialize-javascript: '>=7.0.5'
+  mongoose: '8.24.1'
+  postcss: '8.5.25'
+  sharp: '0.35.1'
