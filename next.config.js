@@ -8,9 +8,13 @@ const NEXT_PUBLIC_SERVER_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  // Include Sharp's package files in the standalone trace.
+  // Sharp and @swc/helpers load runtime files dynamically. Include them in the
+  // standalone trace so the production image is complete with pnpm's layout.
   outputFileTracingIncludes: {
-    '/*': ['node_modules/sharp/**/*'],
+    '/*': [
+      'node_modules/sharp/**/*',
+      'node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*',
+    ],
   },
   images: {
     // Allow local media URLs (e.g. /api/media, /media on same host)
