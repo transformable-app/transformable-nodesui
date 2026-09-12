@@ -96,6 +96,8 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'notification-incidents': NotificationIncident;
+    'notification-deliveries': NotificationDelivery;
   };
   collectionsJoins: {
     'payload-folders': {
@@ -132,6 +134,8 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'notification-incidents': NotificationIncidentsSelect<false> | NotificationIncidentsSelect<true>;
+    'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
   };
   db: {
     defaultIDType: string;
@@ -141,11 +145,13 @@ export interface Config {
     'admin-settings': AdminSetting;
     header: Header;
     'payload-jobs-stats': PayloadJobsStat;
+    'notification-settings': NotificationSettings;
   };
   globalsSelect: {
     'admin-settings': AdminSettingsSelect<false> | AdminSettingsSelect<true>;
     header: HeaderSelect<false> | HeaderSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
+    'notification-settings': NotificationSettingsSelect<false> | NotificationSettingsSelect<true>;
   };
   locale: null;
   widgets: {
@@ -157,6 +163,7 @@ export interface Config {
       'n8n-sync': TaskN8NSync;
       'agent-run-reconciliation': TaskAgentRunReconciliation;
       'agent-retention': TaskAgentRetention;
+      'operations-monitor': TaskOperationsMonitor;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -1704,7 +1711,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'schedulePublish';
+        taskSlug: 'inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'operations-monitor' | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -1737,7 +1744,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'schedulePublish') | null;
+  taskSlug?: ('inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'operations-monitor' | 'schedulePublish') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -2986,6 +2993,51 @@ export interface AdminSetting {
   updatedAt?: string | null;
   createdAt?: string | null;
 }
+
+export interface NotificationIncident {
+  id: string;
+  fingerprint: string;
+  source: string;
+  severity: 'critical' | 'warning' | 'info';
+  status: 'open' | 'resolved';
+  count: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastAlertedAt?: string | null;
+  summary?: string | null;
+  metadata?: unknown;
+  updatedAt: string;
+  createdAt: string;
+}
+export interface NotificationDelivery {
+  id: string;
+  incident: string | NotificationIncident;
+  channel: 'email' | 'ntfy';
+  status: 'sent' | 'failed';
+  error?: string | null;
+  metadata?: unknown;
+  updatedAt: string;
+  createdAt: string;
+}
+export interface NotificationSettings {
+  id: string;
+  enabled?: boolean | null;
+  email?: {
+    enabled?: boolean | null;
+    fromName?: string | null;
+    fromEmail?: string | null;
+    replyTo?: string | null;
+    recipients?: { email: string }[] | null;
+  } | null;
+  ntfyEnabled?: boolean | null;
+  failureThreshold?: number | null;
+  reminderMinutes?: number | null;
+  staleSyncMultiplier?: number | null;
+  ntfyTopic?: string | null;
+}
+export interface NotificationIncidentsSelect<T extends boolean = true> { fingerprint?: T; source?: T; severity?: T; status?: T; count?: T; firstSeenAt?: T; lastSeenAt?: T; lastAlertedAt?: T; summary?: T; metadata?: T; updatedAt?: T; createdAt?: T }
+export interface NotificationDeliveriesSelect<T extends boolean = true> { incident?: T; channel?: T; status?: T; error?: T; metadata?: T; updatedAt?: T; createdAt?: T }
+export interface NotificationSettingsSelect<T extends boolean = true> { enabled?: T; email?: T; ntfyEnabled?: T; failureThreshold?: T; reminderMinutes?: T; staleSyncMultiplier?: T; ntfyTopic?: T }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header".
@@ -3194,6 +3246,11 @@ export interface TaskAgentRetention {
     deletedRuns?: number | null;
     deletedSessions?: number | null;
   };
+}
+
+export interface TaskOperationsMonitor {
+  input: Record<string, never>;
+  output: { checked: number; stale: number; failedJobs: number; stalledJobs: number };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

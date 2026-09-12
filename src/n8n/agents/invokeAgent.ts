@@ -8,6 +8,7 @@ import { finalizePlanTaskFromRun } from './plans/finalizeTask'
 import { resolveRemoteDraftPublishApproval } from './plans/remoteDraftApproval'
 import { redactValue, toPreview } from './redact'
 import { AgentHarnessError, type AgentRequest, type AgentStreamEvent } from './types'
+import { observeFailure } from '@/notifications/service'
 
 const MAX_CONTEXT_KEYS = 20
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000
@@ -843,6 +844,16 @@ export const sendAgentMessage = async ({
       user: req.user,
     })
 
+    if (failedRun.status !== 'cancelled') {
+      await observeFailure(req.payload, {
+        fingerprint: `agent-run:${getRelationshipID(run.agent) || 'unknown'}:${harnessError.code}`,
+        source: 'agent run failure',
+        severity: harnessError.code === 'upstream-timeout' ? 'critical' : 'warning',
+        summary: harnessError.message,
+        metadata: { runID: run.id, requestID: run.requestID, errorCode: harnessError.code },
+      })
+    }
+
     await req.payload.update({
       collection: 'agent-sessions',
       data: {
@@ -1186,6 +1197,16 @@ export const streamAgentMessage = async ({
           req,
           user: req.user,
         })
+
+        if (status !== 'cancelled') {
+          await observeFailure(req.payload, {
+            fingerprint: `agent-run:${getRelationshipID(run.agent) || 'unknown'}:${harnessError.code}`,
+            source: 'agent run failure',
+            severity: status === 'timed-out' ? 'critical' : 'warning',
+            summary: harnessError.message,
+            metadata: { runID: run.id, requestID: run.requestID, errorCode: harnessError.code },
+          })
+        }
 
         await req.payload.update({
           collection: 'agent-sessions',

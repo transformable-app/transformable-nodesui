@@ -167,10 +167,15 @@ Admin-facing view that documents the active job schedule and provides a queue re
 ## Jobs and schedule
 
 - **n8n-sync** - Imports workflows, credentials, executions, and data tables from enabled n8n servers. By default it runs every 15 minutes using `N8N_SYNC_CRON=0 */15 * * * *`.
+- **operations-monitor** - Checks for stale enabled servers every five minutes and raises durable incidents after the configured repeated-failure threshold.
 
 Payload job execution is allowed for logged-in users or requests that include the correct `CRON_SECRET` as `Authorization: Bearer <CRON_SECRET>`.
 
 When `PAYLOAD_JOBS_AUTORUN=true`, the app automatically processes queues in-process using `PAYLOAD_JOBS_AUTORUN_CRON`, which defaults to `* * * * *`.
+
+Operational notifications are configured in the **System → Notifications** global. SMTP credentials remain in environment variables (`SMTP_URL`, `SMTP_FROM`, and `SMTP_FROM_NAME`) and are wired through Payload's Nodemailer adapter. ntfy uses `NTFY_BASE_URL`, `NTFY_TOKEN`, and the configured topic. Incidents are stored in `notification-incidents` and delivery attempts in `notification-deliveries`; notifications are disabled until the global is enabled.
+
+Credential health is derived from n8n's `isResolvable` API field. A credential reported as not resolvable creates a thresholded incident; the incident resolves after n8n reports it resolvable again.
 
 There are also manual endpoints:
 

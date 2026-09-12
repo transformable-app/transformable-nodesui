@@ -1,6 +1,7 @@
 import type { Payload, Where } from 'payload'
 
 import type { DataTable, Server } from '@/payload-types'
+import { observeFailure, resolveIncident } from '@/notifications/service'
 
 type SyncableServer = Pick<
   Server,
@@ -698,6 +699,7 @@ export const syncN8nDataTables = async ({
         serverStatus: 'online',
         healthSummary: summarizeSyncResults([result]),
       })
+      await resolveIncident(payload, `n8n-sync:${server.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown n8n sync error'
       await markServerSyncState({
@@ -707,6 +709,13 @@ export const syncN8nDataTables = async ({
         error: message,
         serverStatus: 'offline',
         healthSummary: `Sync failed: ${message}`,
+      })
+      await observeFailure(payload, {
+        fingerprint: `n8n-sync:${server.id}`,
+        source: 'n8n sync',
+        severity: 'critical',
+        summary: `${server.name}: ${message}`,
+        metadata: { serverID: server.id },
       })
       throw error
     }
@@ -1034,12 +1043,13 @@ const syncServerCredentials = async ({
   for (const credential of credentials) {
     const credentialID = String(credential.id)
     const sourceKey = buildSourceKey(server, credentialID)
+    const isHealthy = credential.isResolvable !== false
     const data = {
       credentialID,
       credentialType: credential.type,
       dataPreview: undefined,
       isGlobal: false,
-      isHealthy: true,
+      isHealthy,
       isManaged: false,
       lastSeenAt: new Date().toISOString(),
       name: credential.name,
@@ -1066,6 +1076,18 @@ const syncServerCredentials = async ({
         id: existing.id,
         data,
       })
+
+      if (isHealthy) {
+        await resolveIncident(payload, `n8n-credential:${sourceKey}`)
+      } else {
+        await observeFailure(payload, {
+          fingerprint: `n8n-credential:${sourceKey}`,
+          source: 'n8n credential unhealthy',
+          severity: 'warning',
+          summary: `${server.name}: credential "${credential.name}" is not resolvable in n8n.`,
+          metadata: { credentialID, credentialType: credential.type, serverID: server.id },
+        })
+      }
       continue
     }
 
@@ -1074,6 +1096,16 @@ const syncServerCredentials = async ({
       draft: false,
       data,
     })
+
+    if (!isHealthy) {
+      await observeFailure(payload, {
+        fingerprint: `n8n-credential:${sourceKey}`,
+        source: 'n8n credential unhealthy',
+        severity: 'warning',
+        summary: `${server.name}: credential "${credential.name}" is not resolvable in n8n.`,
+        metadata: { credentialID, credentialType: credential.type, serverID: server.id },
+      })
+    }
   }
 
   return {
@@ -1152,6 +1184,20 @@ const syncServerExecutions = async ({
     })
 
     if (existing) {
+      if (data.status === 'error' && (existing as { status?: string }).status !== 'error') {
+        const errorFingerprint = (data.errorMessage || 'unknown-error')
+          .toLowerCase()
+          .replace(/\d+/g, '#')
+          .replace(/\s+/g, ' ')
+          .slice(0, 180)
+        await observeFailure(payload, {
+          fingerprint: `n8n-execution:${server.id}:${workflowID || 'unknown'}:${errorFingerprint}`,
+          source: 'n8n execution failure',
+          severity: 'warning',
+          summary: `${server.name}${relatedWorkflow?.name ? ` / ${relatedWorkflow.name}` : ''}: ${data.errorMessage || 'Execution failed.'}`,
+          metadata: { serverID: server.id, workflowID, executionID },
+        })
+      }
       const updatedExecution = await payload.update({
         collection: 'executions',
         id: existing.id,
@@ -1164,6 +1210,21 @@ const syncServerExecutions = async ({
         requestID,
       })
       continue
+    }
+
+    if (data.status === 'error') {
+      const errorFingerprint = (data.errorMessage || 'unknown-error')
+        .toLowerCase()
+        .replace(/\d+/g, '#')
+        .replace(/\s+/g, ' ')
+        .slice(0, 180)
+      await observeFailure(payload, {
+        fingerprint: `n8n-execution:${server.id}:${workflowID || 'unknown'}:${errorFingerprint}`,
+        source: 'n8n execution failure',
+        severity: 'warning',
+        summary: `${server.name}${relatedWorkflow?.name ? ` / ${relatedWorkflow.name}` : ''}: ${data.errorMessage || 'Execution failed.'}`,
+        metadata: { serverID: server.id, workflowID, executionID },
+      })
     }
 
     const createdExecution = await payload.create({
@@ -1260,6 +1321,7 @@ export const syncN8nResources = async ({
         serverStatus: 'online',
         healthSummary: summarizeSyncResults(serverResults),
       })
+      await resolveIncident(payload, `n8n-sync:${server.id}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown n8n sync error'
       await markServerSyncState({
@@ -1269,6 +1331,13 @@ export const syncN8nResources = async ({
         error: message,
         serverStatus: 'offline',
         healthSummary: `Sync failed: ${message}`,
+      })
+      await observeFailure(payload, {
+        fingerprint: `n8n-sync:${server.id}`,
+        source: 'n8n sync',
+        severity: 'critical',
+        summary: `${server.name}: ${message}`,
+        metadata: { serverID: server.id },
       })
       throw error
     }

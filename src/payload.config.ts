@@ -1,8 +1,10 @@
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import sharp from 'sharp'
 import path from 'path'
 import { APIError, buildConfig, PayloadRequest } from 'payload'
 import { fileURLToPath } from 'url'
+import nodemailer from 'nodemailer'
 
 import { Credentials } from './collections/Credentials'
 import { DataTables } from './collections/DataTables'
@@ -25,6 +27,9 @@ import { Roles } from './collections/Roles'
 import { Servers } from './collections/Servers'
 import { Users } from './collections/Users'
 import { Workflows } from './collections/Workflows'
+import { NotificationDeliveries } from './collections/NotificationDeliveries'
+import { NotificationIncidents } from './collections/NotificationIncidents'
+import { NotificationSettings } from './globals/NotificationSettings'
 import { Admin } from './Admin/config'
 import { Header } from './Header/config'
 import { plugins } from './plugins'
@@ -108,6 +113,13 @@ export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL || '',
   }),
+  email: nodemailerAdapter({
+    defaultFromAddress: process.env.SMTP_FROM ?? 'noreply@localhost',
+    defaultFromName: process.env.SMTP_FROM_NAME ?? 'Nodes UI',
+    ...(process.env.SMTP_URL && {
+      transport: nodemailer.createTransport(process.env.SMTP_URL),
+    }),
+  }),
   collections: [
     Pages,
     Media,
@@ -130,6 +142,8 @@ export default buildConfig({
     Roles,
     Users,
     PayloadSites,
+    NotificationIncidents,
+    NotificationDeliveries,
   ],
   cors: [getServerSideURL(), 'https://payloadcms.3twenty9.com'].filter(
     (url): url is string => Boolean(url) && typeof url === 'string',
@@ -169,7 +183,7 @@ export default buildConfig({
       },
     },
   ],
-  globals: [Admin, Header],
+  globals: [Admin, Header, NotificationSettings],
   plugins,
   secret: process.env.PAYLOAD_SECRET,
   sharp,

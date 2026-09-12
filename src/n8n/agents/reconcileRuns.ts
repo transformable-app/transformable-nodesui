@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { observeFailure } from '@/notifications/service'
 
 const NON_TERMINAL_STATUSES = ['queued', 'running', 'waiting'] as const
 const DEFAULT_STALE_AFTER_MS = 5 * 60 * 1000
@@ -47,6 +48,14 @@ export const reconcileAgentRuns = async ({
       },
       id: run.id,
       overrideAccess: true,
+    })
+
+    await observeFailure(payload, {
+      fingerprint: `agent-timeout:${getRelationID(run.agent) || 'unknown'}`,
+      source: 'agent run timeout',
+      severity: 'critical',
+      summary: 'An agent run was left non-terminal and was reconciled as timed out.',
+      metadata: { runID: run.id, requestID: run.requestID },
     })
 
     if (sessionID) {
