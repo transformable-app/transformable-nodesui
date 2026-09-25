@@ -29,10 +29,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "payload": "^3.89.0"
+    "payload": "^3.90.1"
   },
   "devDependencies": {
-    "payload": "3.89.0",
+    "payload": "3.90.1",
     "typescript": "5.7.3"
   }
 }
