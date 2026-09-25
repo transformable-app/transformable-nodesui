@@ -137,6 +137,8 @@ Payload stores the resume URL on an `agent-approvals` record. The browser approv
 
 For the generated page flow, approval happens after the target-site draft is created. AgentPlanBlock submits the task without pre-write approval, n8n returns a `cms-draft` envelope, NodesUI creates the draft in the target Payload site, then NodesUI creates a pending Payload approval with `approvalType: "remote-draft-publish"`. Resolving that approval publishes the remote draft in the target Payload site, records a `remote-draft-audits` publish entry, marks the run's `remoteDraft.status` as `published`, and completes the task without rerunning n8n or creating a duplicate draft.
 
+NodesUI makes up to three total remote draft write attempts. If local draft validation fails or the target explicitly rejects a write with a validation response, NodesUI invokes the configured n8n agent again and includes the previous draft and target error in `input.data.cmsDraftRetry` and in `input.text`. The retry also receives the synced remote schema and the same output binding. Configure the AI node to use `input.text` as its instruction and `input.data.cmsDraftRetry.previousDraft` / `previousError` to repair the output. The n8n workflow returns a new complete `cms-draft` envelope; NodesUI performs each remote write and keeps the final validation and audit. Ambiguous network failures and failures after a confirmed remote write are not retried, to avoid duplicate drafts.
+
 For `cms-draft` tasks, the workflow returns:
 
 ```json

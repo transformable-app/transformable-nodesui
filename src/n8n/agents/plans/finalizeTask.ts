@@ -4,6 +4,7 @@ import { redactValue, toPreview } from '@/n8n/agents/redact'
 import type { AgentInvokeResult } from '@/n8n/agents/types'
 
 import {
+  CMSDraftWriteError,
   getExpectedOutputType,
   recordCMSDraftWriteFailure,
   writeCMSDraftFromTaskOutput,
@@ -30,6 +31,12 @@ const getTaskStatusForResponse = (response: AgentInvokeResult) => {
   if (response.status === 'failed') return 'failed'
   return 'succeeded'
 }
+
+type CMSDraftRetry = (args: {
+  attempt: number
+  error: string
+  previousOutput: unknown
+}) => Promise<{ response: AgentInvokeResult; runID: string }>
 
 const getPlanStatusFromTasks = (tasks: RunnablePlanTask[]) => {
   if (tasks.some((task) => task.status === 'running')) return 'running'
@@ -73,11 +80,13 @@ export const refreshPlanStatus = async ({
 }
 
 export const finalizePlanTask = async ({
+  retryCMSDraft,
   req,
   response,
   runID,
   taskID,
 }: {
+  retryCMSDraft?: CMSDraftRetry
   req: PayloadRequest
   response: AgentInvokeResult
   runID: string
@@ -95,40 +104,77 @@ export const finalizePlanTask = async ({
   })
   let cmsDraftError: string | undefined
   let cmsDraftWriteSucceeded = false
+  let activeRunID = runID
+  let activeResponse = response
+  let activeOutputValue = outputValue
 
   if (status === 'succeeded' && getExpectedOutputType(existingTask.expectedOutput) === 'cms-draft') {
-    try {
-      await writeCMSDraftFromTaskOutput({
-        outputBinding: existingTask.outputBinding,
-        output: outputValue,
-        req,
-        runID,
-      })
-      await createRemoteDraftPublishApproval({
-        req,
-        runID,
-      })
-      cmsDraftWriteSucceeded = true
-    } catch (error) {
-      cmsDraftError = error instanceof Error ? error.message : 'CMS draft write failed.'
-      await recordCMSDraftWriteFailure({
-        error: cmsDraftError,
-        req,
-        runID,
-      })
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await writeCMSDraftFromTaskOutput({
+          outputBinding: existingTask.outputBinding,
+          output: activeOutputValue,
+          req,
+          runID: activeRunID,
+        })
+        cmsDraftWriteSucceeded = true
+        break
+      } catch (error) {
+        const writeError = error instanceof Error ? error.message : 'CMS draft write failed.'
+        await recordCMSDraftWriteFailure({
+          error: writeError,
+          req,
+          runID: activeRunID,
+        })
+
+        const isRetryable = !(error instanceof CMSDraftWriteError) || error.retryable
+        if (!isRetryable || attempt === 3 || !retryCMSDraft) {
+          cmsDraftError = `CMS draft write failed on attempt ${attempt} of 3: ${writeError}`
+          break
+        }
+
+        const retry = await retryCMSDraft({
+          attempt: attempt + 1,
+          error: writeError,
+          previousOutput: activeOutputValue,
+        })
+        activeRunID = retry.runID
+        activeResponse = retry.response
+        activeOutputValue = retry.response.data ?? retry.response.content
+
+        if (retry.response.status !== 'succeeded') {
+          cmsDraftError = `CMS draft retry ${attempt + 1} could not produce a draft: ${retry.response.content || retry.response.status}`
+          break
+        }
+      }
+    }
+
+    if (cmsDraftWriteSucceeded) {
+      try {
+        await createRemoteDraftPublishApproval({
+          req,
+          runID: activeRunID,
+        })
+      } catch (error) {
+        cmsDraftError = error instanceof Error ? error.message : 'Remote draft approval could not be created.'
+      }
     }
   }
 
-  const finalStatus = cmsDraftError ? 'failed' : cmsDraftWriteSucceeded ? 'needs-approval' : status
+  const finalStatus = cmsDraftError
+    ? 'failed'
+    : cmsDraftWriteSucceeded
+      ? 'needs-approval'
+      : getTaskStatusForResponse(activeResponse)
   const task = await req.payload.update({
     collection: 'agent-plan-tasks',
     data: {
-      errorCode: cmsDraftError ? 'workflow-error' : response.status === 'failed' ? 'workflow-error' : undefined,
-      errorMessage: cmsDraftError ?? (response.status === 'failed' ? response.content : undefined),
+      errorCode: cmsDraftError ? 'workflow-error' : activeResponse.status === 'failed' ? 'workflow-error' : undefined,
+      errorMessage: cmsDraftError ?? (activeResponse.status === 'failed' ? activeResponse.content : undefined),
       finishedAt: finalStatus === 'succeeded' || finalStatus === 'failed' ? finishedAt : undefined,
-      latestRun: runID,
-      outputPreview: toPreview(outputValue, 8000),
-      outputSummary: asPayloadJSON(redactValue(response.data ?? { content: response.content })),
+      latestRun: activeRunID,
+      outputPreview: toPreview(activeOutputValue, 8000),
+      outputSummary: asPayloadJSON(redactValue(activeResponse.data ?? { content: activeResponse.content })),
       status: finalStatus,
     },
     id: taskID,

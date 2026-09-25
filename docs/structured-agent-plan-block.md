@@ -142,10 +142,13 @@ Payload should run the loop as a managed state machine:
    ```
 
 5. Include `planID`, `taskID`, task instructions, task input, objective, bounded shared context, and prior dependency outputs in `input.data`.
-6. Let n8n execute the single task and return or callback with a normal structured response.
-7. Validate the task output against `expectedOutput.schema` when present.
-8. Mark the task `succeeded`, `failed`, `waiting`, `cancelled`, or `needs-approval`.
-9. Repeat until all tasks are terminal, blocked, cancelled, or the plan reaches its iteration/time limits.
+6. For `cms-draft` tasks, include the synced target collection schema in `input.data.remoteCMSSchema` and append it to `input.text`. The context includes the target fields, block slugs and block fields, plus the block and field allowlists that apply to this task. Workflows should pass this guidance to the model so it can produce a compatible draft on the first attempt.
+7. Let n8n execute the single task and return or callback with a normal structured response.
+8. Validate the task output against `expectedOutput.schema` when present.
+9. Mark the task `succeeded`, `failed`, `waiting`, `cancelled`, or `needs-approval`.
+10. Repeat until all tasks are terminal, blocked, cancelled, or the plan reaches its iteration/time limits.
+
+When a remote CMS draft write fails, NodesUI can invoke the n8n agent again up to two more times (three write attempts total). Each retry includes `input.data.cmsDraftRetry` with `attempt`, `maxAttempts`, `previousDraft`, and `previousError`; `input.text` also includes the error and asks the model to repair the draft. Return a complete `cms-draft` envelope for each retry. NodesUI remains responsible for all target-site writes and retries only when it has not confirmed that the remote write succeeded.
 
 The loop must be resumable. A process restart should not lose state because the next job tick or reconciliation pass can inspect persisted plan/task/run state and continue from the last terminal boundary.
 

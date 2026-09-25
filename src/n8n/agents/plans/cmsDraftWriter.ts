@@ -8,6 +8,16 @@ import type { AgentArtifact, Media, PayloadSite } from '@/payload-types'
 
 import { createRemoteDraftAudit } from './remoteDraftAudit'
 
+export class CMSDraftWriteError extends Error {
+  retryable: boolean
+
+  constructor(message: string, retryable: boolean) {
+    super(message)
+    this.name = 'CMSDraftWriteError'
+    this.retryable = retryable
+  }
+}
+
 type CMSDraftTarget = {
   collection: string
   id?: string
@@ -889,6 +899,8 @@ export const writeCMSDraftFromTaskOutput = async ({
   const document = { ...draft.document }
   const payloadSiteID = String(site.id)
   const attemptedAt = new Date().toISOString()
+  let remoteWriteCompleted = false
+  let remoteWriteRequestStarted = false
 
   try {
     assertSiteCanWrite(site, draft.target.collection)
@@ -916,6 +928,7 @@ export const writeCMSDraftFromTaskOutput = async ({
       site,
     })
 
+    remoteWriteRequestStarted = true
     const response = await writeDraftDocument({
       collection: draft.target.collection,
       data: document,
@@ -923,6 +936,7 @@ export const writeCMSDraftFromTaskOutput = async ({
       operation: draft.target.operation,
       site,
     })
+    remoteWriteCompleted = true
 
     const remoteDocumentID = getRemoteID(response)
     const remoteVersionID =
@@ -1000,24 +1014,39 @@ export const writeCMSDraftFromTaskOutput = async ({
 
     return remoteDraft
   } catch (error) {
-    await createRemoteDraftAudit({
-      audit: {
-        attemptedAt,
-        collection: draft.target.collection,
-        completedAt: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'CMS draft write failed.',
-        operation: draft.target.operation,
-        outputBinding: binding,
-        payloadSite: payloadSiteID,
-        requestDocument: document,
-        run: runID,
-        status: 'failed',
-        target: draft.target,
-      },
-      req,
-    })
+    const message = error instanceof Error ? error.message : 'CMS draft write failed.'
+    try {
+      await createRemoteDraftAudit({
+        audit: {
+          attemptedAt,
+          collection: draft.target.collection,
+          completedAt: new Date().toISOString(),
+          error: message,
+          operation: draft.target.operation,
+          outputBinding: binding,
+          payloadSite: payloadSiteID,
+          requestDocument: document,
+          run: runID,
+          status: 'failed',
+          target: draft.target,
+        },
+        req,
+      })
+    } catch (auditError) {
+      const auditMessage = auditError instanceof Error ? auditError.message : 'Remote draft audit failed.'
+      throw new CMSDraftWriteError(
+        remoteWriteCompleted
+          ? `Remote draft was posted, but its audit could not be recorded: ${auditMessage}`
+          : `Remote draft attempt failed and its audit could not be recorded: ${auditMessage}`,
+        false,
+      )
+    }
 
-    throw error
+    const retryable =
+      !remoteWriteCompleted &&
+      (!remoteWriteRequestStarted ||
+        (error instanceof APIError && (error.status === 400 || error.status === 422)))
+    throw new CMSDraftWriteError(message, retryable)
   }
 }
 
