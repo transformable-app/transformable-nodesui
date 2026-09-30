@@ -4,7 +4,6 @@ import sharp from 'sharp'
 import path from 'path'
 import { APIError, buildConfig, PayloadRequest } from 'payload'
 import { fileURLToPath } from 'url'
-import nodemailer from 'nodemailer'
 
 import { Credentials } from './collections/Credentials'
 import { DataTables } from './collections/DataTables'
@@ -48,6 +47,21 @@ const dirname = path.dirname(filename)
 const requiredRoles = ['Admin', 'User'] as const
 const jobsAutoRunEnabled = process.env.PAYLOAD_JOBS_AUTORUN === 'true'
 const jobsAutoRunCron = process.env.PAYLOAD_JOBS_AUTORUN_CRON || '* * * * *'
+const smtpURL = process.env.SMTP_URL
+const smtpTransportOptions = (() => {
+  if (!smtpURL) return undefined
+
+  const url = new URL(smtpURL)
+  return {
+    host: url.hostname,
+    port: url.port ? Number(url.port) : url.protocol === 'smtps:' ? 465 : 587,
+    secure: url.protocol === 'smtps:',
+    auth: {
+      user: decodeURIComponent(url.username),
+      pass: decodeURIComponent(url.password),
+    },
+  }
+})()
 
 export default buildConfig({
   serverURL: getServerSideURL(),
@@ -116,9 +130,7 @@ export default buildConfig({
   email: nodemailerAdapter({
     defaultFromAddress: process.env.SMTP_FROM ?? 'noreply@localhost',
     defaultFromName: process.env.SMTP_FROM_NAME ?? 'Nodes UI',
-    ...(process.env.SMTP_URL && {
-      transport: nodemailer.createTransport(process.env.SMTP_URL),
-    }),
+    ...(smtpTransportOptions && { transportOptions: smtpTransportOptions }),
   }),
   collections: [
     Pages,
