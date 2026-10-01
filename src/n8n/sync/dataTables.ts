@@ -2,7 +2,7 @@ import type { Payload, Where } from 'payload'
 
 import type { DataTable, Server } from '@/payload-types'
 import { observeFailure, resolveIncident } from '@/notifications/service'
-import { sendWorkflowFailurePush } from '@/notifications/mobilePush'
+import { processMobilePushDeliveries, sendWorkflowFailurePush } from '@/notifications/mobilePush'
 
 type SyncableServer = Pick<
   Server,
@@ -14,6 +14,7 @@ type SyncableServer = Pick<
   | 'lastSyncError'
   | 'lastSyncStatus'
   | 'lastSuccessfulSyncAt'
+  | 'failurePushBaselineAt'
   | 'lastSyncedAt'
   | 'name'
   | 'syncEnabled'
@@ -1185,7 +1186,12 @@ const syncServerExecutions = async ({
     })
 
     if (existing) {
-      if (data.status === 'error' && (existing as { status?: string }).status !== 'error') {
+      const previousStatus = (existing as { status?: string }).status
+      if (
+        data.status === 'error' &&
+        (previousStatus === 'running' || previousStatus === 'waiting') &&
+        Boolean(server.failurePushBaselineAt)
+      ) {
         const errorFingerprint = (data.errorMessage || 'unknown-error')
           .toLowerCase()
           .replace(/\d+/g, '#')
@@ -1210,7 +1216,11 @@ const syncServerExecutions = async ({
         payload,
         requestID,
       })
-      if (data.status === 'error' && (existing as { status?: string }).status !== 'error') {
+      if (
+        data.status === 'error' &&
+        (previousStatus === 'running' || previousStatus === 'waiting') &&
+        Boolean(server.failurePushBaselineAt)
+      ) {
         await sendWorkflowFailurePush(payload, {
           executionID,
           executionDocID: updatedExecution.id,
@@ -1246,13 +1256,11 @@ const syncServerExecutions = async ({
       draft: false,
       data,
     })
-    const previousSuccessfulSync = server.lastSuccessfulSyncAt
-      ? new Date(server.lastSuccessfulSyncAt).getTime()
-      : null
     if (
       data.status === 'error' &&
-      previousSuccessfulSync !== null &&
-      new Date(data.startedAt).getTime() >= previousSuccessfulSync
+      server.failurePushBaselineAt &&
+      new Date(data.finishedAt || data.startedAt).getTime() >=
+        new Date(server.failurePushBaselineAt).getTime()
     ) {
       await sendWorkflowFailurePush(payload, {
         executionID,
@@ -1284,6 +1292,16 @@ const syncServerExecutions = async ({
       data: {
         lastExecutionAt: toDateOrUndefined(lastExecutionAt),
       },
+    })
+  }
+
+  await processMobilePushDeliveries(payload)
+
+  if (!server.failurePushBaselineAt) {
+    await payload.update({
+      collection: 'servers',
+      id: server.id,
+      data: { failurePushBaselineAt: new Date().toISOString() },
     })
   }
 

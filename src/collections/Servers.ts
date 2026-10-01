@@ -168,6 +168,15 @@ export const Servers: CollectionConfig = {
           'Opaque checkpoint data for incremental syncs, such as pagination or updated-after cursors.',
       },
     },
+    {
+      name: 'failurePushBaselineAt',
+      type: 'date',
+      admin: {
+        readOnly: true,
+        description:
+          'Initial execution sync baseline; historical failures before this time are not pushed.',
+      },
+    },
   ],
   timestamps: true,
 }

@@ -30,6 +30,7 @@ import { NotificationDeliveries } from './collections/NotificationDeliveries'
 import { NotificationIncidents } from './collections/NotificationIncidents'
 import { NotificationSettings } from './globals/NotificationSettings'
 import { MobileDevices } from './collections/MobileDevices'
+import { MobilePushDeliveries } from './collections/MobilePushDeliveries'
 import { Admin } from './Admin/config'
 import { Header } from './Header/config'
 import { plugins } from './plugins'
@@ -159,6 +160,7 @@ export default buildConfig({
     NotificationIncidents,
     NotificationDeliveries,
     MobileDevices,
+    MobilePushDeliveries,
   ],
   cors: [getServerSideURL(), 'https://payloadcms.3twenty9.com'].filter(
     (url): url is string => Boolean(url) && typeof url === 'string',

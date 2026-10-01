@@ -1,6 +1,17 @@
-import { APIError, type Endpoint, type PayloadRequest, type Where } from 'payload'
+import {
+  APIError,
+  type CollectionConfig,
+  type Endpoint,
+  type PayloadRequest,
+  type Where,
+} from 'payload'
 
 import { checkRole } from '@/access/utilities'
+import { adminAuthenticatedAndNotContentManager } from '@/access/contentManagerRestrictions'
+import { Agents } from '@/collections/Agents'
+import { Executions } from '@/collections/Executions'
+import { Servers } from '@/collections/Servers'
+import { Workflows } from '@/collections/Workflows'
 import type { Execution, Server, Workflow } from '@/payload-types'
 
 type MobileRequest = PayloadRequest & { user: NonNullable<PayloadRequest['user']> }
@@ -74,6 +85,13 @@ const serverSummary = (doc: Server) => ({
   lastSyncError: doc.lastSyncError?.slice(0, 500) ?? null,
 })
 
+const allowsRead = async (collection: CollectionConfig, req: MobileRequest) => {
+  const read = collection.access?.read
+  if (read === undefined) return true
+  if (typeof read === 'function') return Boolean(await read({ req } as never))
+  return Boolean(read)
+}
+
 const list = async <T>(
   req: MobileRequest,
   collection: 'workflows' | 'executions' | 'servers',
@@ -114,7 +132,15 @@ const mobileConfig: Endpoint = {
     Response.json({
       apiVersion: 1,
       product: 'nodesui',
-      capabilities: ['monitoring', 'workflow-failure-push', 'agents'],
+      deploymentID: process.env.NODESUI_DEPLOYMENT_ID || null,
+      deploymentName: process.env.NODESUI_DEPLOYMENT_NAME || null,
+      capabilities: [
+        'monitoring',
+        'workflow-failure-push',
+        'agents',
+        'incidents',
+        'agent-commands',
+      ],
     }),
 }
 
@@ -122,15 +148,25 @@ const mobileMe: Endpoint = {
   path: '/mobile/me',
   method: 'get',
   handler: async (req) => {
-    const user = requireUser(req).user
+    const mobileReq = requireUser(req)
+    const user = mobileReq.user
+    const [agentAccess, incidentAccess, monitoringAccess] = await Promise.all([
+      allowsRead(Agents, mobileReq),
+      adminAuthenticatedAndNotContentManager({ req: mobileReq }),
+      Promise.all(
+        [Executions, Workflows, Servers].map((collection) => allowsRead(collection, mobileReq)),
+      ),
+    ])
     return Response.json({
       id: user.id,
       name: user.name ?? null,
       email: user.email,
       roles: user.roleNames ?? [],
       capabilities: {
-        monitoring: true,
-        agents: true,
+        monitoring: monitoringAccess.every(Boolean),
+        agents: agentAccess,
+        incidents: Boolean(incidentAccess),
+        agentCommands: false,
         administerServers: checkRole(['Admin'], user),
       },
     })
@@ -592,21 +628,45 @@ const mobileNotificationPreferences: Endpoint = {
       collection: 'mobile-devices',
       depth: 0,
       limit: 100,
+      page: 1,
       overrideAccess: true,
       where: { user: { equals: req.user.id } },
     })
+    const allDevices = [...devices.docs]
+    for (let page = 2; page <= devices.totalPages; page += 1) {
+      const nextPage = await req.payload.find({
+        collection: 'mobile-devices',
+        depth: 0,
+        limit: 100,
+        page,
+        overrideAccess: true,
+        where: { user: { equals: req.user.id } },
+      })
+      allDevices.push(...nextPage.docs)
+    }
     const mutedWorkflowIDs = [
       ...new Set(
-        devices.docs.flatMap((device) =>
+        allDevices.flatMap((device) =>
           (device.mutedWorkflows ?? []).map((workflow) =>
             typeof workflow === 'string' ? workflow : workflow.id,
           ),
         ),
       ),
     ]
+    const accessibleMuted = mutedWorkflowIDs.length
+      ? await req.payload.find({
+          collection: 'workflows',
+          depth: 0,
+          limit: mutedWorkflowIDs.length,
+          overrideAccess: false,
+          req,
+          user: req.user,
+          where: { id: { in: mutedWorkflowIDs } },
+        })
+      : { docs: [] as Array<{ id: string }> }
     return Response.json({
-      enabled: devices.docs.some((device) => device.workflowFailuresEnabled),
-      mutedWorkflowIDs,
+      enabled: allDevices.some((device) => device.workflowFailuresEnabled),
+      mutedWorkflowIDs: accessibleMuted.docs.map((workflow) => workflow.id),
     })
   },
 }
@@ -619,20 +679,45 @@ const updateMobileNotificationPreferences: Endpoint = {
     const body = await readBody(req)
     if (typeof body.enabled !== 'boolean')
       return Response.json({ error: 'enabled must be a boolean.' }, { status: 400 })
-    const muted = Array.isArray(body.mutedWorkflowIDs)
+    const requestedMuted = Array.isArray(body.mutedWorkflowIDs)
       ? body.mutedWorkflowIDs
           .filter((id): id is string => typeof id === 'string' && id.length <= 100)
           .slice(0, 100)
       : []
+    const accessibleWorkflows = requestedMuted.length
+      ? await req.payload.find({
+          collection: 'workflows',
+          depth: 0,
+          limit: requestedMuted.length,
+          overrideAccess: false,
+          req,
+          user: req.user,
+          where: { id: { in: requestedMuted } },
+        })
+      : { docs: [] as Array<{ id: string }> }
+    const muted = accessibleWorkflows.docs.map((workflow) => workflow.id)
     const devices = await req.payload.find({
       collection: 'mobile-devices',
       depth: 0,
       limit: 100,
+      page: 1,
       overrideAccess: true,
       where: { user: { equals: req.user.id } },
     })
+    const allDevices = [...devices.docs]
+    for (let page = 2; page <= devices.totalPages; page += 1) {
+      const nextPage = await req.payload.find({
+        collection: 'mobile-devices',
+        depth: 0,
+        limit: 100,
+        page,
+        overrideAccess: true,
+        where: { user: { equals: req.user.id } },
+      })
+      allDevices.push(...nextPage.docs)
+    }
     await Promise.all(
-      devices.docs.map((device) =>
+      allDevices.map((device) =>
         req.payload.update({
           collection: 'mobile-devices',
           id: device.id,

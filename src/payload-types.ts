@@ -91,6 +91,7 @@ export interface Config {
     'notification-incidents': NotificationIncident;
     'notification-deliveries': NotificationDelivery;
     'mobile-devices': MobileDevice;
+    'mobile-push-deliveries': MobilePushDelivery;
     forms: Form;
     'form-submissions': FormSubmission;
     'payload-kv': PayloadKv;
@@ -130,6 +131,7 @@ export interface Config {
     'notification-incidents': NotificationIncidentsSelect<false> | NotificationIncidentsSelect<true>;
     'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
     'mobile-devices': MobileDevicesSelect<false> | MobileDevicesSelect<true>;
+    'mobile-push-deliveries': MobilePushDeliveriesSelect<false> | MobilePushDeliveriesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -320,6 +322,10 @@ export interface Server {
     | number
     | boolean
     | null;
+  /**
+   * Initial execution sync baseline; historical failures before this time are not pushed.
+   */
+  failurePushBaselineAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1686,6 +1692,46 @@ export interface MobileDevice {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mobile-push-deliveries".
+ */
+export interface MobilePushDelivery {
+  id: string;
+  eventKey: string;
+  server: string | Server;
+  execution: string | Execution;
+  device: string | MobileDevice;
+  recipient: string | User;
+  groupKey: string;
+  notification:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  display:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  status: 'pending' | 'ticketed' | 'sent' | 'failed';
+  attempts: number;
+  nextAttemptAt?: string | null;
+  ticketID?: string | null;
+  lastAttemptAt?: string | null;
+  error?: string | null;
+  receiptStatus?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
 export interface FormSubmission {
@@ -1936,6 +1982,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'mobile-devices';
         value: string | MobileDevice;
+      } | null)
+    | ({
+        relationTo: 'mobile-push-deliveries';
+        value: string | MobilePushDelivery;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2266,6 +2316,7 @@ export interface ServersSelect<T extends boolean = true> {
   lastSyncStatus?: T;
   lastSyncError?: T;
   syncCursor?: T;
+  failurePushBaselineAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2807,6 +2858,29 @@ export interface MobileDevicesSelect<T extends boolean = true> {
   workflowFailuresEnabled?: T;
   mutedWorkflows?: T;
   lastRegisteredAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mobile-push-deliveries_select".
+ */
+export interface MobilePushDeliveriesSelect<T extends boolean = true> {
+  eventKey?: T;
+  server?: T;
+  execution?: T;
+  device?: T;
+  recipient?: T;
+  groupKey?: T;
+  notification?: T;
+  display?: T;
+  status?: T;
+  attempts?: T;
+  nextAttemptAt?: T;
+  ticketID?: T;
+  lastAttemptAt?: T;
+  error?: T;
+  receiptStatus?: T;
   updatedAt?: T;
   createdAt?: T;
 }
