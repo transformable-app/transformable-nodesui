@@ -294,8 +294,14 @@ export default buildConfig({
       : undefined,
     jobsCollectionOverrides: ({ defaultJobsCollection }) => ({
       ...defaultJobsCollection,
+      access: {
+        ...defaultJobsCollection.access,
+        admin: adminOnly,
+        read: adminOnly,
+      },
       admin: {
         ...defaultJobsCollection.admin,
+        group: 'System',
         hidden: false,
       },
     }),
