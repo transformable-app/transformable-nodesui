@@ -2,6 +2,7 @@ import type { Payload, Where } from 'payload'
 
 import type { DataTable, Server } from '@/payload-types'
 import { observeFailure, resolveIncident } from '@/notifications/service'
+import { sendWorkflowFailurePush } from '@/notifications/mobilePush'
 
 type SyncableServer = Pick<
   Server,
@@ -1209,6 +1210,19 @@ const syncServerExecutions = async ({
         payload,
         requestID,
       })
+      if (data.status === 'error' && (existing as { status?: string }).status !== 'error') {
+        await sendWorkflowFailurePush(payload, {
+          executionID,
+          executionDocID: updatedExecution.id,
+          startedAt: data.startedAt,
+          errorMessage: data.errorMessage,
+          serverID: String(server.id),
+          serverName: server.name,
+          workflowID: relatedWorkflow?.id ? String(relatedWorkflow.id) : workflowID,
+          workflowName: relatedWorkflow?.name,
+          n8nURL: relatedWorkflow?.n8nURL,
+        })
+      }
       continue
     }
 
@@ -1232,6 +1246,26 @@ const syncServerExecutions = async ({
       draft: false,
       data,
     })
+    const previousSuccessfulSync = server.lastSuccessfulSyncAt
+      ? new Date(server.lastSuccessfulSyncAt).getTime()
+      : null
+    if (
+      data.status === 'error' &&
+      previousSuccessfulSync !== null &&
+      new Date(data.startedAt).getTime() >= previousSuccessfulSync
+    ) {
+      await sendWorkflowFailurePush(payload, {
+        executionID,
+        executionDocID: createdExecution.id,
+        startedAt: data.startedAt,
+        errorMessage: data.errorMessage,
+        serverID: String(server.id),
+        serverName: server.name,
+        workflowID: relatedWorkflow?.id ? String(relatedWorkflow.id) : workflowID,
+        workflowName: relatedWorkflow?.name,
+        n8nURL: relatedWorkflow?.n8nURL,
+      })
+    }
     await linkAgentRunToExecution({
       executionDocID: createdExecution.id,
       executionID,

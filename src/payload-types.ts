@@ -88,6 +88,9 @@ export interface Config {
     roles: Role;
     users: User;
     'payload-sites': PayloadSite;
+    'notification-incidents': NotificationIncident;
+    'notification-deliveries': NotificationDelivery;
+    'mobile-devices': MobileDevice;
     forms: Form;
     'form-submissions': FormSubmission;
     'payload-kv': PayloadKv;
@@ -96,8 +99,6 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
-    'notification-incidents': NotificationIncident;
-    'notification-deliveries': NotificationDelivery;
   };
   collectionsJoins: {
     'payload-folders': {
@@ -126,6 +127,9 @@ export interface Config {
     roles: RolesSelect<false> | RolesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-sites': PayloadSitesSelect<false> | PayloadSitesSelect<true>;
+    'notification-incidents': NotificationIncidentsSelect<false> | NotificationIncidentsSelect<true>;
+    'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
+    'mobile-devices': MobileDevicesSelect<false> | MobileDevicesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -134,8 +138,6 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
-    'notification-incidents': NotificationIncidentsSelect<false> | NotificationIncidentsSelect<true>;
-    'notification-deliveries': NotificationDeliveriesSelect<false> | NotificationDeliveriesSelect<true>;
   };
   db: {
     defaultIDType: string;
@@ -144,14 +146,14 @@ export interface Config {
   globals: {
     'admin-settings': AdminSetting;
     header: Header;
+    'notification-settings': NotificationSetting;
     'payload-jobs-stats': PayloadJobsStat;
-    'notification-settings': NotificationSettings;
   };
   globalsSelect: {
     'admin-settings': AdminSettingsSelect<false> | AdminSettingsSelect<true>;
     header: HeaderSelect<false> | HeaderSelect<true>;
-    'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
     'notification-settings': NotificationSettingsSelect<false> | NotificationSettingsSelect<true>;
+    'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: null;
   widgets: {
@@ -766,9 +768,6 @@ export interface Form {
       )[]
     | null;
   submitButtonLabel?: string | null;
-  /**
-   * Choose whether to display an on-page message or redirect to a different page after they submit the form.
-   */
   confirmationType?: ('message' | 'redirect') | null;
   confirmationMessage?: {
     root: {
@@ -788,9 +787,6 @@ export interface Form {
   redirect?: {
     url: string;
   };
-  /**
-   * Send custom emails when the form submits. Use comma separated lists to send the same email to multiple recipients. To reference a value from this form, wrap that field's name with double curly brackets, i.e. {{firstName}}. You can use a wildcard {{*}} to output all data and {{*:table}} to format it as an HTML table in the email.
-   */
   emails?:
     | {
         emailTo?: string | null;
@@ -799,9 +795,6 @@ export interface Form {
         replyTo?: string | null;
         emailFrom?: string | null;
         subject: string;
-        /**
-         * Enter the message that should be sent in this email.
-         */
         message?: {
           root: {
             type: string;
@@ -1218,11 +1211,13 @@ export interface User {
   enableAPIKey?: boolean | null;
   apiKey?: string | null;
   apiKeyIndex?: string | null;
+  hasAPIKey?: boolean | null;
   email: string;
   resetPasswordToken?: string | null;
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -1627,6 +1622,70 @@ export interface RemoteDraftAudit {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-incidents".
+ */
+export interface NotificationIncident {
+  id: string;
+  fingerprint: string;
+  source: string;
+  severity: 'critical' | 'warning' | 'info';
+  status: 'open' | 'resolved';
+  count: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastAlertedAt?: string | null;
+  summary?: string | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-deliveries".
+ */
+export interface NotificationDelivery {
+  id: string;
+  incident: string | NotificationIncident;
+  channel: 'email' | 'ntfy';
+  status: 'sent' | 'failed';
+  error?: string | null;
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mobile-devices".
+ */
+export interface MobileDevice {
+  id: string;
+  user: string | User;
+  token: string;
+  platform: 'ios' | 'android';
+  workflowFailuresEnabled: boolean;
+  mutedWorkflows?: (string | Workflow)[] | null;
+  lastRegisteredAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
 export interface FormSubmission {
@@ -1711,7 +1770,13 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'operations-monitor' | 'schedulePublish';
+        taskSlug:
+          | 'inline'
+          | 'n8n-sync'
+          | 'agent-run-reconciliation'
+          | 'agent-retention'
+          | 'operations-monitor'
+          | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -1744,7 +1809,16 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'n8n-sync' | 'agent-run-reconciliation' | 'agent-retention' | 'operations-monitor' | 'schedulePublish') | null;
+  taskSlug?:
+    | (
+        | 'inline'
+        | 'n8n-sync'
+        | 'agent-run-reconciliation'
+        | 'agent-retention'
+        | 'operations-monitor'
+        | 'schedulePublish'
+      )
+    | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -1850,6 +1924,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'payload-sites';
         value: string | PayloadSite;
+      } | null)
+    | ({
+        relationTo: 'notification-incidents';
+        value: string | NotificationIncident;
+      } | null)
+    | ({
+        relationTo: 'notification-deliveries';
+        value: string | NotificationDelivery;
+      } | null)
+    | ({
+        relationTo: 'mobile-devices';
+        value: string | MobileDevice;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2617,11 +2703,13 @@ export interface UsersSelect<T extends boolean = true> {
   enableAPIKey?: T;
   apiKey?: T;
   apiKeyIndex?: T;
+  hasAPIKey?: T;
   email?: T;
   resetPasswordToken?: T;
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -2674,6 +2762,51 @@ export interface PayloadSitesSelect<T extends boolean = true> {
         allowedMimeTypes?: T;
         maxFileSizeBytes?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-incidents_select".
+ */
+export interface NotificationIncidentsSelect<T extends boolean = true> {
+  fingerprint?: T;
+  source?: T;
+  severity?: T;
+  status?: T;
+  count?: T;
+  firstSeenAt?: T;
+  lastSeenAt?: T;
+  lastAlertedAt?: T;
+  summary?: T;
+  metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-deliveries_select".
+ */
+export interface NotificationDeliveriesSelect<T extends boolean = true> {
+  incident?: T;
+  channel?: T;
+  status?: T;
+  error?: T;
+  metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mobile-devices_select".
+ */
+export interface MobileDevicesSelect<T extends boolean = true> {
+  user?: T;
+  token?: T;
+  platform?: T;
+  workflowFailuresEnabled?: T;
+  mutedWorkflows?: T;
+  lastRegisteredAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2993,51 +3126,6 @@ export interface AdminSetting {
   updatedAt?: string | null;
   createdAt?: string | null;
 }
-
-export interface NotificationIncident {
-  id: string;
-  fingerprint: string;
-  source: string;
-  severity: 'critical' | 'warning' | 'info';
-  status: 'open' | 'resolved';
-  count: number;
-  firstSeenAt: string;
-  lastSeenAt: string;
-  lastAlertedAt?: string | null;
-  summary?: string | null;
-  metadata?: unknown;
-  updatedAt: string;
-  createdAt: string;
-}
-export interface NotificationDelivery {
-  id: string;
-  incident: string | NotificationIncident;
-  channel: 'email' | 'ntfy';
-  status: 'sent' | 'failed';
-  error?: string | null;
-  metadata?: unknown;
-  updatedAt: string;
-  createdAt: string;
-}
-export interface NotificationSettings {
-  id: string;
-  enabled?: boolean | null;
-  email?: {
-    enabled?: boolean | null;
-    fromName?: string | null;
-    fromEmail?: string | null;
-    replyTo?: string | null;
-    recipients?: { email: string }[] | null;
-  } | null;
-  ntfyEnabled?: boolean | null;
-  failureThreshold?: number | null;
-  reminderMinutes?: number | null;
-  staleSyncMultiplier?: number | null;
-  ntfyTopic?: string | null;
-}
-export interface NotificationIncidentsSelect<T extends boolean = true> { fingerprint?: T; source?: T; severity?: T; status?: T; count?: T; firstSeenAt?: T; lastSeenAt?: T; lastAlertedAt?: T; summary?: T; metadata?: T; updatedAt?: T; createdAt?: T }
-export interface NotificationDeliveriesSelect<T extends boolean = true> { incident?: T; channel?: T; status?: T; error?: T; metadata?: T; updatedAt?: T; createdAt?: T }
-export interface NotificationSettingsSelect<T extends boolean = true> { enabled?: T; email?: T; ntfyEnabled?: T; failureThreshold?: T; reminderMinutes?: T; staleSyncMultiplier?: T; ntfyTopic?: T }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header".
@@ -3091,6 +3179,38 @@ export interface Header {
         id?: string | null;
       }[]
     | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * Thresholds and channel switches for operational alerts.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-settings".
+ */
+export interface NotificationSetting {
+  id: string;
+  enabled?: boolean | null;
+  email?: {
+    enabled?: boolean | null;
+    fromName?: string | null;
+    fromEmail?: string | null;
+    replyTo?: string | null;
+    /**
+     * Email addresses that receive operational alerts.
+     */
+    recipients?:
+      | {
+          email: string;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  ntfyEnabled?: boolean | null;
+  failureThreshold?: number | null;
+  reminderMinutes?: number | null;
+  staleSyncMultiplier?: number | null;
+  ntfyTopic?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -3159,6 +3279,35 @@ export interface HeaderSelect<T extends boolean = true> {
             };
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notification-settings_select".
+ */
+export interface NotificationSettingsSelect<T extends boolean = true> {
+  enabled?: T;
+  email?:
+    | T
+    | {
+        enabled?: T;
+        fromName?: T;
+        fromEmail?: T;
+        replyTo?: T;
+        recipients?:
+          | T
+          | {
+              email?: T;
+              id?: T;
+            };
+      };
+  ntfyEnabled?: T;
+  failureThreshold?: T;
+  reminderMinutes?: T;
+  staleSyncMultiplier?: T;
+  ntfyTopic?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -3247,10 +3396,18 @@ export interface TaskAgentRetention {
     deletedSessions?: number | null;
   };
 }
-
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskOperations-monitor".
+ */
 export interface TaskOperationsMonitor {
-  input: Record<string, never>;
-  output: { checked: number; stale: number; failedJobs: number; stalledJobs: number };
+  input?: unknown;
+  output: {
+    checked?: number | null;
+    stale?: number | null;
+    failedJobs?: number | null;
+    stalledJobs?: number | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -3265,7 +3422,10 @@ export interface TaskSchedulePublish {
       value: string | Page;
     } | null;
     global?: string | null;
-    user?: (string | null) | User;
+    user?: {
+      relationTo: 'users';
+      value: string | User;
+    } | null;
   };
   output?: unknown;
 }

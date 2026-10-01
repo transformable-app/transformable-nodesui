@@ -29,6 +29,7 @@ import { Workflows } from './collections/Workflows'
 import { NotificationDeliveries } from './collections/NotificationDeliveries'
 import { NotificationIncidents } from './collections/NotificationIncidents'
 import { NotificationSettings } from './globals/NotificationSettings'
+import { MobileDevices } from './collections/MobileDevices'
 import { Admin } from './Admin/config'
 import { Header } from './Header/config'
 import { plugins } from './plugins'
@@ -37,6 +38,7 @@ import { getServerSideURL } from './utilities/getURL'
 import { n8nSyncEndpoints } from './endpoints/n8nSync'
 import { agentEndpoints } from './endpoints/agents'
 import { sampleWorkflowEndpoints } from './endpoints/sampleWorkflows'
+import { mobileEndpoints } from './endpoints/mobile'
 import { ensureDashNavItem } from './endpoints/seed/ensure-dash-nav-item'
 import { issueForm } from './endpoints/seed/issue-form'
 import { yourAutomationsDash } from './endpoints/seed/your-automations-dash'
@@ -156,6 +158,7 @@ export default buildConfig({
     PayloadSites,
     NotificationIncidents,
     NotificationDeliveries,
+    MobileDevices,
   ],
   cors: [getServerSideURL(), 'https://payloadcms.3twenty9.com'].filter(
     (url): url is string => Boolean(url) && typeof url === 'string',
@@ -167,6 +170,7 @@ export default buildConfig({
     ...agentEndpoints,
     ...n8nSyncEndpoints,
     ...sampleWorkflowEndpoints,
+    ...mobileEndpoints,
     {
       path: '/jobs/reset',
       method: 'post',
