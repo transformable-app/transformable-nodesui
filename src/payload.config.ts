@@ -44,6 +44,8 @@ import { ensureDashNavItem } from './endpoints/seed/ensure-dash-nav-item'
 import { issueForm } from './endpoints/seed/issue-form'
 import { yourAutomationsDash } from './endpoints/seed/your-automations-dash'
 import { tasks } from './jobs'
+import { adminOnly } from './access/adminOnly'
+import { checkRole } from './access/utilities'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -296,7 +298,7 @@ export default buildConfig({
       ...defaultJobsCollection,
       access: {
         ...defaultJobsCollection.access,
-        admin: adminOnly,
+        admin: ({ req }: { req: PayloadRequest }): boolean => checkRole(['Admin'], req.user),
         read: adminOnly,
       },
       admin: {
