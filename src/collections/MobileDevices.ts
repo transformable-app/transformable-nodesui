@@ -19,7 +19,7 @@ export const MobileDevices: CollectionConfig = {
     update: ownDevices,
   },
   admin: {
-    group: 'Users',
+    group: 'System',
     defaultColumns: ['user', 'platform', 'workflowFailuresEnabled', 'updatedAt'],
     hidden: ({ user }) => !checkRole(['Admin'], user as User | null | undefined),
   },
