@@ -173,6 +173,12 @@ Payload job execution is allowed for logged-in users or requests that include th
 
 When `PAYLOAD_JOBS_AUTORUN=true`, the app automatically processes queues in-process using `PAYLOAD_JOBS_AUTORUN_CRON`, which defaults to `* * * * *`.
 
+Sync API requests default to 500 ms between request starts per n8n origin. Set `N8N_API_REQUEST_DELAY_MS` to adjust this spacing; `0` disables it. Manual syncs, scheduled syncs, pagination, and retries share the delay within each app process. Separate app replicas have independent request schedules. Temporary HTTP 429/502/503/504 responses receive up to three retries with increasing delays. `Retry-After` is honored up to 30 seconds; a longer requested wait fails the sync rather than retrying early.
+
+Execution sync reads both the running execution list (`status=running`) and the default history list. It requests detailed data (`includeData=true`) for error messages, stacks, and agent request matching. Records are merged by execution ID; history takes precedence when an execution finishes during sync. n8n's redaction policy and execution data size limits remain in effect. These requests follow the n8n 2.40.4 API contract.
+
+The sync API key needs `workflow:list`, `credential:list`, `execution:list`, `dataTable:list`, and `dataTableRow:read` scopes where scoped keys are supported. The credentials list requires an instance owner or admin key. Credential secrets are not requested or returned by that list endpoint.
+
 Operational notifications are configured in the **System → Notifications** global. SMTP credentials remain in environment variables (`SMTP_URL`, `SMTP_FROM`, and `SMTP_FROM_NAME`) and are wired through Payload's Nodemailer adapter. ntfy uses `NTFY_BASE_URL`, `NTFY_TOKEN`, and the configured topic. Incidents are stored in `notification-incidents` and delivery attempts in `notification-deliveries`; notifications are disabled until the global is enabled.
 
 Credential health is derived from n8n's `isResolvable` API field. A credential reported as not resolvable creates a thresholded incident; the incident resolves after n8n reports it resolvable again.

@@ -3,6 +3,8 @@ import type { Payload, Where } from 'payload'
 import type { DataTable, Server } from '@/payload-types'
 import { observeFailure, resolveIncident } from '@/notifications/service'
 import { processMobilePushDeliveries, sendWorkflowFailurePush } from '@/notifications/mobilePush'
+import { fetchN8nPages } from './fetchPage'
+import { fetchN8nExecutions, type N8nExecution } from './executions'
 
 type SyncableServer = Pick<
   Server,
@@ -40,11 +42,6 @@ type N8nDataTableRow = Record<string, unknown> & {
   id?: number | string
   createdAt?: string
   updatedAt?: string
-}
-
-type CursorPage<T> = {
-  data: T[]
-  nextCursor?: string | null
 }
 
 type SyncServerResult = {
@@ -107,21 +104,6 @@ type N8nCredential = {
     createdAt?: string
     updatedAt?: string
   }>
-}
-
-type N8nExecution = {
-  id: number | string
-  customData?: Record<string, unknown>
-  data?: Record<string, unknown>
-  finished?: boolean
-  mode?: string
-  retryOf?: number | string | null
-  retrySuccessId?: number | string | null
-  startedAt?: string
-  status?: 'canceled' | 'crashed' | 'error' | 'new' | 'running' | 'success' | 'unknown' | 'waiting'
-  stoppedAt?: string | null
-  waitTill?: string | null
-  workflowId?: number | string
 }
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
@@ -328,41 +310,12 @@ const getExecutionErrorStack = (execution: N8nExecution) => {
   return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined
 }
 
-const getDurationMS = (startedAt?: string, stoppedAt?: string | null) => {
+const getDurationMS = (startedAt?: string | null, stoppedAt?: string | null) => {
   if (!startedAt || !stoppedAt) return undefined
   const start = new Date(startedAt).getTime()
   const end = new Date(stoppedAt).getTime()
   if (Number.isNaN(start) || Number.isNaN(end)) return undefined
   return Math.max(0, end - start)
-}
-
-const fetchN8nPage = async <T>({
-  path,
-  server,
-  searchParams,
-}: {
-  path: string
-  searchParams?: URLSearchParams
-  server: Pick<SyncableServer, 'apiKey' | 'apiPath' | 'baseURL'>
-}): Promise<T> => {
-  const url = new URL(`${buildBaseAPIURL(server)}${path}`)
-  if (searchParams) {
-    searchParams.forEach((value, key) => url.searchParams.set(key, value))
-  }
-
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'X-N8N-API-KEY': server.apiKey,
-    },
-    method: 'GET',
-  })
-
-  if (!response.ok) {
-    throw new Error(`n8n API request failed (${response.status}) for ${url.pathname}`)
-  }
-
-  return (await response.json()) as T
 }
 
 const fetchAllPages = async <T>({
@@ -374,20 +327,9 @@ const fetchAllPages = async <T>({
   path: string
   server: Pick<SyncableServer, 'apiKey' | 'apiPath' | 'baseURL'>
 }) => {
-  const data: T[] = []
-  let cursor: string | undefined
-
-  do {
-    const searchParams = new URLSearchParams()
-    searchParams.set('limit', String(limit))
-    if (cursor) searchParams.set('cursor', cursor)
-
-    const page = await fetchN8nPage<CursorPage<T>>({ path, searchParams, server })
-    data.push(...page.data)
-    cursor = page.nextCursor || undefined
-  } while (cursor)
-
-  return data
+  const url = new URL(`${buildBaseAPIURL(server)}${path}`)
+  url.searchParams.set('limit', String(limit))
+  return fetchN8nPages<T>(url, server.apiKey)
 }
 
 const resourceLabels: Record<SyncResource, string> = {
@@ -1127,10 +1069,7 @@ const syncServerExecutions = async ({
   payload: Payload
   server: SyncableServer
 }): Promise<SyncServerResult> => {
-  const executions = await fetchAllPages<N8nExecution>({
-    path: '/executions',
-    server,
-  })
+  const executions = await fetchN8nExecutions(buildBaseAPIURL(server), server.apiKey)
 
   const workflowMap = await getWorkflowMapForServer(payload, server.id)
   const latestExecutionByWorkflowID = new Map<string, string>()
