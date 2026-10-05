@@ -44,6 +44,8 @@ import { ensureDashNavItem } from './endpoints/seed/ensure-dash-nav-item'
 import { issueForm } from './endpoints/seed/issue-form'
 import { yourAutomationsDash } from './endpoints/seed/your-automations-dash'
 import { tasks } from './jobs'
+import { startStuckJobWatchdog } from './jobs/recoverStuckJobs'
+import { getCurrentJobsBuildID, resetAllJobs, resetJobsForNewBuild } from './jobs/resetJobs'
 import { adminOnly } from './access/adminOnly'
 import { checkRole } from './access/utilities'
 
@@ -183,18 +185,10 @@ export default buildConfig({
           throw new APIError('Unauthorized', 401)
         }
 
-        await req.payload.delete({
-          collection: 'payload-jobs',
-          where: { id: { exists: true } },
-          overrideAccess: false,
-          req,
-        })
-
-        await req.payload.updateGlobal({
-          slug: 'payload-jobs-stats',
-          data: {
-            stats: {},
-          },
+        await resetAllJobs({
+          buildID: getCurrentJobsBuildID(),
+          payload: req.payload,
+          reason: 'manual-reset',
           overrideAccess: false,
           req,
         })
@@ -208,6 +202,14 @@ export default buildConfig({
   secret: process.env.PAYLOAD_SECRET,
   sharp,
   onInit: async (payload) => {
+    const reset = await resetJobsForNewBuild({ payload })
+    if (reset.reason === 'missing-build-id') {
+      payload.logger.info('Payload jobs build reset skipped: no build ID configured')
+    } else if (reset.reset) {
+      payload.logger.info(`Payload jobs reset for build ${reset.buildID}`)
+    }
+
+    startStuckJobWatchdog(payload)
     for (const name of requiredRoles) {
       const existingRole = await payload.find({
         collection: 'roles',

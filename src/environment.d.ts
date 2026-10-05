@@ -2,6 +2,7 @@ declare global {
   namespace NodeJS {
     interface ProcessEnv {
       PAYLOAD_SECRET: string
+      PAYLOAD_JOBS_BUILD_ID?: string
       DATABASE_URL: string
       NEXT_PUBLIC_SERVER_URL: string
       NEXT_PUBLIC_RECAPTCHA_SITE_KEY?: string
