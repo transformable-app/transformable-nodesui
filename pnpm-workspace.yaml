@@ -10,7 +10,7 @@ allowBuilds:
 overrides:
   file-type: '>=21.3.1'
   fast-xml-parser: '>=5.7.0'
-  rollup: '>=4.59.0'
+  rollup: '>=4.62.3'
   esbuild: '>=0.28.1'
   '@babel/core': '>=7.29.6 <8'
   '@opentelemetry/core': '>=2.8.0'
