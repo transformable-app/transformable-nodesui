@@ -7,38 +7,76 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+patchedDependencies:
+  # Preserve structured validation errors with the security override to Zod 4.
+  '@payload-enchants/docs-reorder@1.2.2': patches/@payload-enchants__docs-reorder@1.2.2.patch
+  # GHSA-vfj7-8cjw-p6xm: fixed nesting/traversal cap; remove after an official fix is verified.
+  braces@3.0.3: patches/braces@3.0.3.patch
+
 overrides:
   file-type: '>=21.3.1'
   fast-xml-parser: '>=5.7.0'
-  rollup: '>=4.62.3'
+  rollup: '^4.64.5'
   esbuild: '>=0.28.1'
   '@babel/core': '>=7.29.6 <8'
   '@opentelemetry/core': '>=2.8.0'
   eslint>ajv: '>=6.14.0 <7'
   minimatch: '>=10.2.3'
-  undici: '>=7.30.0 <8'
+  undici: '>=7.30.1 <8'
   flatted: '>=3.4.2'
   picomatch: '>=4.0.4'
   brace-expansion: '5.0.12'
   ws: '>=8.21.0'
-  nodemailer: '10.0.12'
+  nodemailer: '10.1.4'
   nanoid: '>=3.3.17 <4'
   uuid: '>=14.0.0'
   yaml: '>=1.10.3'
   js-yaml: '>=5.4.2 <6'
   baseline-browser-mapping: '>=2.11.0 <3'
   'payload>ajv': '>=8.18.0'
-  fast-uri: '>=4.1.5'
+  fast-uri: '>=4.2.3 <5'
   qs: '>=6.16.0'
   browserslist: '>=4.28.7'
   '@humanfs/node': '>=0.16.8'
   source-map-js: '>=1.2.2'
   postcss-selector-parser: '>=6.1.3'
   fast-copy: '>=3.1.0'
-  dompurify: '3.4.16'
+  dompurify: '3.4.17'
   immutable: '>=5.1.8'
   lodash: '>=4.18.0'
   serialize-javascript: '>=7.0.5'
   mongoose: '8.24.1'
   postcss: '8.5.25'
   sharp: '>=0.35.5 <0.36.0'
+  fast-xml-builder: '>=1.1.7'
+  vite: '7.3.7'
+  happy-dom: '21.0.4'
+  zod: '4.6.6'
+
+minimumReleaseAgeExclude:
+  - '@payloadcms/admin-bar'
+  - '@payloadcms/db-mongodb'
+  - '@payloadcms/email-nodemailer'
+  - '@payloadcms/graphql'
+  - '@payloadcms/live-preview-react'
+  - '@payloadcms/live-preview'
+  - '@payloadcms/next'
+  - '@payloadcms/plugin-form-builder'
+  - '@payloadcms/plugin-nested-docs'
+  - '@payloadcms/plugin-seo'
+  - '@payloadcms/richtext-lexical'
+  - '@payloadcms/translations'
+  - '@payloadcms/ui'
+  - payload
+  - '@next/env@16.4.2'
+  - '@next/eslint-plugin-next@16.4.2'
+  - '@next/swc-darwin-arm64@16.4.2'
+  - '@next/swc-darwin-x64@16.4.2'
+  - '@next/swc-linux-arm64-gnu@16.4.2'
+  - '@next/swc-linux-arm64-musl@16.4.2'
+  - '@next/swc-linux-x64-gnu@16.4.2'
+  - '@next/swc-linux-x64-musl@16.4.2'
+  - '@next/swc-win32-arm64-msvc@16.4.2'
+  - '@next/swc-win32-x64-msvc@16.4.2'
+  - eslint-config-next@16.4.2
+  - next@16.4.2
