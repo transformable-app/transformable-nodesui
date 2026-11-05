@@ -6,12 +6,17 @@ import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
+const pluginRequire = createRequire(require.resolve('@payload-enchants/docs-reorder'))
 const handlerURL = pathToFileURL(
   join(dirname(require.resolve('@payload-enchants/docs-reorder')), 'handlers/saveChanges.js'),
 ).href
 const { saveChanges, schema } = await import(/* @vite-ignore */ handlerURL)
 
 describe('reorder plugin with patched Zod', () => {
+  it('resolves the patched Zod 4 release from the plugin', () => {
+    expect(pluginRequire('zod/package.json').version).toBe('4.6.6')
+  })
+
   it('returns structured validation errors before checking access', async () => {
     const access = vi.fn()
     const response = await saveChanges({ access })({
