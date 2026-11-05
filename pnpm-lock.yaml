@@ -9,6 +9,7 @@ overrides:
   fast-xml-parser: '>=5.7.0'
   rollup: ^4.64.5
   glob: '>=14.0.2'
+  deepmerge: npm:@corex/deepmerge@4.0.43
   esbuild: '>=0.28.1'
   '@babel/core': '>=7.29.6 <8'
   '@opentelemetry/core': '>=2.8.0'
@@ -3115,10 +3116,6 @@ packages:
 
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
-
-  deepmerge@4.3.1:
-    resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
-    engines: {node: '>=0.10.0'}
 
   define-data-property@1.1.4:
     resolution: {integrity: sha512-rBMvIzlpA8v6E+SJZoo++HAYqsLrkg7MSfIinMPFhmkorw7X+dOXVJQs+QT69zGkzMyfDnIMN2Wid1+NbL3T+A==}
@@ -8395,8 +8392,6 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  deepmerge@4.3.1: {}
-
   define-data-property@1.1.4:
     dependencies:
       es-define-property: 1.0.1
@@ -9992,7 +9987,7 @@ snapshots:
       console-table-printer: 2.12.1
       croner: 10.0.1
       dataloader: 2.2.3
-      deepmerge: 4.3.1
+      deepmerge: '@corex/deepmerge@4.0.43'
       file-type: 21.3.4
       get-tsconfig: 4.8.1
       graphql: 17.0.2

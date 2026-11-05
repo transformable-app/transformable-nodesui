@@ -18,6 +18,7 @@ overrides:
   fast-xml-parser: '>=5.7.0'
   rollup: '^4.64.5'
   glob: '>=14.0.2'
+  deepmerge: 'npm:@corex/deepmerge@4.0.43'
   esbuild: '>=0.28.1'
   '@babel/core': '>=7.29.6 <8'
   '@opentelemetry/core': '>=2.8.0'
