@@ -49,6 +49,7 @@ describe('payload-sites endpoints', () => {
       apiKeySecretReference: 'secret-ref',
       baseURL: 'https://target.test',
       schemaProfileEndpoint: '/api/nodesui/schema-profile',
+      schemaProfileStatus: 'missing',
     }
     const req = makeReq(site)
     mockedCheckCompanionPlugin.mockResolvedValue({
@@ -60,6 +61,10 @@ describe('payload-sites endpoints', () => {
     const response = await getEndpoint('/:id/check-companion-plugin').handler(req as never)
 
     expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      companionPluginStatus: 'connected',
+      schemaProfileStatus: 'missing',
+    })
     expect(mockedCheckCompanionPlugin).toHaveBeenCalledWith(
       expect.objectContaining({ apiKey: 'stored-payload-key' }),
     )
@@ -68,12 +73,12 @@ describe('payload-sites endpoints', () => {
         collection: 'payload-sites',
         data: expect.objectContaining({
           companionPluginStatus: 'connected',
-          schemaProfileStatus: 'synced',
         }),
         id: 'site-1',
         req,
       }),
     )
+    expect(req.payload.update.mock.calls[0]?.[0].data).not.toHaveProperty('schemaProfileStatus')
   })
 
   it('marks schema stale and disables write-back when synced profile hash changes', async () => {

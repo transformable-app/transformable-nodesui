@@ -1,19 +1,21 @@
 'use client'
 
 import React, { useCallback, useState } from 'react'
-import { toast, useDocumentInfo, useFormFields } from '@payloadcms/ui'
+import { toast, useDocumentInfo, useForm, useFormFields } from '@payloadcms/ui'
 import type { UIFieldClientComponent } from 'payload'
 
 import './index.scss'
 
 type PayloadSiteActionResponse = {
+  companionPluginStatus?: string
   error?: string
+  errors?: { message?: string }[]
   ok?: boolean
   payloadSite?: {
+    companionPluginStatus?: string
     schemaProfileHash?: string
     schemaProfileStatus?: string
   }
-  profileHash?: string
   schemaProfileStatus?: string
 }
 
@@ -24,6 +26,7 @@ const getFieldValue = (fields: Record<string, { value?: unknown }>, name: string
 
 export const PayloadSiteActionsField: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo()
+  const { dispatchFields } = useForm()
   const [checking, setChecking] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [accepting, setAccepting] = useState(false)
@@ -54,18 +57,29 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
           method: 'POST',
         })
         const data = (await response.json().catch(() => ({}))) as PayloadSiteActionResponse
+        const companionStatus = data.companionPluginStatus || data.payloadSite?.companionPluginStatus
+        const status = data.schemaProfileStatus || data.payloadSite?.schemaProfileStatus
+        const hash = data.payloadSite?.schemaProfileHash
 
-        if (!response.ok || data.ok === false) {
-          throw new Error(data.error || 'Payload site setup action failed.')
+        for (const [path, value] of Object.entries({
+          companionPluginStatus: companionStatus,
+          schemaProfileHash: hash,
+          schemaProfileStatus: status,
+        })) {
+          if (value !== undefined) {
+            dispatchFields({ initialValue: value, path, type: 'UPDATE', value })
+          }
         }
 
-        const status = data.schemaProfileStatus || data.payloadSite?.schemaProfileStatus
-        const hash = data.profileHash || data.payloadSite?.schemaProfileHash
+        if (!response.ok || data.ok === false) {
+          throw new Error(data.error || data.errors?.[0]?.message || 'Payload site setup action failed.')
+        }
+
         const message = isSync
           ? `Schema profile ${status || 'synced'}${hash ? ` (${hash.slice(0, 8)})` : ''}.`
           : isAccept
             ? `Schema profile ${status || 'accepted'}. Review complete; enable write-back separately when ready.`
-            : 'Companion plugin check completed.'
+            : `Companion plugin: ${companionStatus || 'check complete'}.`
 
         setLastResult(message)
         toast.success(message)
@@ -79,7 +93,7 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
         else setChecking(false)
       }
     },
-    [id],
+    [dispatchFields, id],
   )
 
   return (

@@ -30,7 +30,7 @@ export const checkCompanionPlugin = async (
   } catch (error) {
     const message = error instanceof APIError ? error.message : 'Companion plugin check failed.'
     return {
-      companionPluginStatus: 'error',
+      companionPluginStatus: error instanceof APIError && error.status === 404 ? 'missing' : 'error',
       error: message,
       ok: false,
       schemaProfileStatus: 'error',

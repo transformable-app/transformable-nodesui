@@ -54,17 +54,19 @@ export const payloadSiteCollectionEndpoints: Endpoint[] = [
       await req.payload.update({
         collection: 'payload-sites',
         data: {
-          companionPluginError: result.error,
+          companionPluginError: result.error ?? null,
           companionPluginLastCheckedAt: new Date().toISOString(),
           companionPluginStatus: result.companionPluginStatus,
-          schemaProfileStatus: result.schemaProfileStatus,
         },
         id: site.id,
         overrideAccess: true,
         req,
       })
 
-      return Response.json(result, { status: result.ok ? 200 : 502 })
+      return Response.json(
+        { ...result, schemaProfileStatus: site.schemaProfileStatus },
+        { status: result.ok ? 200 : 502 },
+      )
     },
   },
   {
@@ -96,7 +98,7 @@ export const payloadSiteCollectionEndpoints: Endpoint[] = [
         collection: 'payload-sites',
         data: {
           capabilities: result.capabilities,
-          companionPluginError: undefined,
+          companionPluginError: null,
           companionPluginLastCheckedAt: new Date().toISOString(),
           companionPluginStatus: result.companionPluginStatus,
           schemaProfile: result.schemaProfile,
