@@ -1417,12 +1417,14 @@ export interface PayloadSite {
    */
   apiKeyAuthCollection: string;
   /**
-   * Environment variable name containing the target Payload API key.
+   * API key from the target Payload site. Required for new sites.
    */
-  apiKeySecretReference: string;
+  apiKey?: string | null;
   /**
-   * Optional n8n credential name or secret reference for a separate read-only Payload API key on this target site.
+   * Optional read-only API key from the target Payload site.
    */
+  n8nReadAPIKey?: string | null;
+  apiKeySecretReference?: string | null;
   n8nReadAPIKeySecretReference?: string | null;
   schemaProfileEndpoint: string;
   companionPluginStatus: 'missing' | 'connected' | 'stale' | 'error';
@@ -2784,6 +2786,8 @@ export interface PayloadSitesSelect<T extends boolean = true> {
   baseURL?: T;
   adminURL?: T;
   apiKeyAuthCollection?: T;
+  apiKey?: T;
+  n8nReadAPIKey?: T;
   apiKeySecretReference?: T;
   n8nReadAPIKeySecretReference?: T;
   schemaProfileEndpoint?: T;

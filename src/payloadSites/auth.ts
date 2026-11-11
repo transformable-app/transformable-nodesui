@@ -19,10 +19,13 @@ const getEnvSecret = (reference: string) => {
 
 export const getPayloadAPIKeyAuthHeader = (site: PayloadSiteConfig): string => {
   const authCollection = site.apiKeyAuthCollection?.trim() || 'users'
+  const apiKey = site.apiKey?.trim()
+  if (apiKey) return `${authCollection} API-Key ${apiKey}`
+
   const secretReference = site.apiKeySecretReference?.trim()
 
   if (!secretReference) {
-    throw new APIError('Payload site API key secret reference is required.', 400)
+    throw new APIError('A Payload API key is required.', 400)
   }
 
   return `${authCollection} API-Key ${getEnvSecret(secretReference)}`

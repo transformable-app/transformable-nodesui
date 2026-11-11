@@ -5,10 +5,10 @@ export type CompanionPluginStatus = (typeof companionPluginStatuses)[number]
 export type SchemaProfileStatus = (typeof schemaProfileStatuses)[number]
 
 export type PayloadSiteConfig = {
+  apiKey?: string | null
   apiKeyAuthCollection?: string | null
   apiKeySecretReference?: string | null
   baseURL?: string | null
-  n8nReadAPIKeySecretReference?: string | null
   readableCollections?: string[] | null
   schemaProfileEndpoint?: string | null
 }

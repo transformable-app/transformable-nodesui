@@ -5,6 +5,13 @@ import { checkCompanionPlugin } from '@/payloadSites/companionPlugin'
 
 type PayloadSiteEndpointRequest = Parameters<Endpoint['handler']>[0]
 
+const excludeCredentials = {
+  apiKey: false,
+  apiKeySecretReference: false,
+  n8nReadAPIKey: false,
+  n8nReadAPIKeySecretReference: false,
+} as const
+
 const requireAdmin = (req: PayloadSiteEndpointRequest) => {
   if (!req.user || !checkRole(['Admin'], req.user)) {
     throw new APIError('Unauthorized', 401)
@@ -28,6 +35,7 @@ const getCheckData = async (req: PayloadSiteEndpointRequest) => {
   requireAdmin(req)
   const site = await getSite(req)
   const result = await checkCompanionPlugin({
+    apiKey: site.apiKey,
     apiKeyAuthCollection: site.apiKeyAuthCollection,
     apiKeySecretReference: site.apiKeySecretReference,
     baseURL: site.baseURL,
@@ -100,6 +108,7 @@ export const payloadSiteCollectionEndpoints: Endpoint[] = [
         id: site.id,
         overrideAccess: true,
         req,
+        select: excludeCredentials,
       })
 
       return Response.json({ ok: true, payloadSite: updatedSite, schemaProfileStatus })
@@ -141,6 +150,7 @@ export const payloadSiteCollectionEndpoints: Endpoint[] = [
         id: site.id,
         overrideAccess: true,
         req,
+        select: excludeCredentials,
       })
 
       return Response.json({

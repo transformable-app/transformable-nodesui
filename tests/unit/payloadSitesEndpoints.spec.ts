@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { checkCompanionPlugin } from '@/payloadSites/companionPlugin'
+import { getPayloadAPIKeyAuthHeader } from '@/payloadSites/auth'
 import { payloadSiteCollectionEndpoints } from '@/endpoints/payloadSites'
 
 vi.mock('@/payloadSites/companionPlugin', () => ({
@@ -43,6 +44,7 @@ describe('payload-sites endpoints', () => {
   it('updates companion plugin and schema status on check', async () => {
     const site = {
       id: 'site-1',
+      apiKey: 'stored-payload-key',
       apiKeyAuthCollection: 'users',
       apiKeySecretReference: 'secret-ref',
       baseURL: 'https://target.test',
@@ -58,6 +60,9 @@ describe('payload-sites endpoints', () => {
     const response = await getEndpoint('/:id/check-companion-plugin').handler(req as never)
 
     expect(response.status).toBe(200)
+    expect(mockedCheckCompanionPlugin).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'stored-payload-key' }),
+    )
     expect(req.payload.update).toHaveBeenCalledWith(
       expect.objectContaining({
         collection: 'payload-sites',
@@ -103,6 +108,7 @@ describe('payload-sites endpoints', () => {
           schemaProfileStatus: 'stale',
           writeBackEnabled: false,
         }),
+        select: expect.objectContaining({ apiKey: false, n8nReadAPIKey: false }),
       }),
     )
   })
@@ -136,5 +142,28 @@ describe('payload-sites endpoints', () => {
         data: expect.objectContaining({ writeBackEnabled: true }),
       }),
     )
+  })
+})
+
+describe('Payload API key authorization', () => {
+  it('prefers the stored key and uses the configured Payload auth collection', () => {
+    expect(
+      getPayloadAPIKeyAuthHeader({
+        apiKey: ' STORED_KEY ',
+        apiKeyAuthCollection: 'integration-users',
+        apiKeySecretReference: 'UNUSED_LEGACY_KEY',
+      }),
+    ).toBe('integration-users API-Key STORED_KEY')
+  })
+
+  it('resolves existing environment references when no key has been saved', () => {
+    vi.stubEnv('LEGACY_PAYLOAD_SITE_TEST_KEY', 'legacy-key')
+    try {
+      expect(
+        getPayloadAPIKeyAuthHeader({ apiKeySecretReference: 'LEGACY_PAYLOAD_SITE_TEST_KEY' }),
+      ).toBe('users API-Key legacy-key')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

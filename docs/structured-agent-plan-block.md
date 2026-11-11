@@ -270,8 +270,8 @@ Add a `payload-sites` collection or equivalent configuration surface with:
 - `baseURL`: trusted origin for the target Payload REST API
 - `adminURL`: optional editor/admin link root for review links
 - `apiKeyAuthCollection`: auth collection slug for Payload API key authentication, defaulting to `users`
-- `apiKeySecretReference`: environment or secret-manager reference for that site's Payload API key, never the API key value itself
-- `n8nReadAPIKeySecretReference`: optional reference/name for a separate read-only target-site API key credential managed in n8n
+- `apiKey` stores the target site's Payload API key encrypted in NodesUI. Existing sites can use `apiKeySecretReference` until an Admin saves a key.
+- `n8nReadAPIKey` stores an optional read-only Payload API key encrypted in NodesUI. Workflows that read the site directly use their own credential in n8n.
 - `companionPluginStatus`: `missing`, `connected`, `stale`, or `error`
 - `allowedCollections`: allowlist of writable collection slugs, initially focused on `pages` and `media`
 - `readableCollections`: allowlist of collection slugs that n8n agents may read directly through the target site's Payload API
@@ -394,7 +394,7 @@ Add a focused module for remote Payload operations:
 
 - `src/payloadSites/types.ts`: site config, capabilities, block schema profile, and draft output types.
 - `src/payloadSites/buildEndpoint.ts`: SSRF-safe API URL builder using a trusted site base URL plus normalized API paths.
-- `src/payloadSites/auth.ts`: resolves the site's Payload API key secret reference server-side and builds the Payload API key auth header for the configured auth collection.
+- `src/payloadSites/auth.ts` builds the Payload API key header with the site's saved key and auth collection.
 - `src/payloadSites/client.ts`: typed REST helpers for find, create draft, update draft, upload media, and fetch preview/admin URLs.
 - `src/payloadSites/schemaProfile.ts`: fetches, validates, normalizes, hashes, and stores target-site schema profiles.
 - `src/payloadSites/companionPlugin.ts`: checks companion plugin connectivity, version compatibility, schema-profile support, and write-back readiness.
@@ -424,7 +424,8 @@ Remote Payload API calls are not Local API calls, so `overrideAccess` does not a
 
 - Add `agent-plans` and `agent-plan-tasks` collection configs.
 - Add plan input schema, defaults, dependency validation, optional `payloadSite` targeting, and redaction helpers.
-- Add `payload-sites` configuration with role access, trusted base URL, write-back Payload API key secret reference, optional n8n read API key credential reference/name, auth collection slug, companion plugin status, writable/readable collection allowlists, media policy, and saved schema profile fields.
+- Add `payload-sites` configuration with role access, a trusted base URL, a write-back Payload API key, and an optional n8n read-only key.
+- Store the auth collection slug, companion plugin status, collection allowlists, media policy, and schema profile on each site.
 - Add schema-profile sync and compatibility checks through the required target-site companion plugin.
 - Add validate/start endpoints.
 - Define sample workflow metadata for plan-capable workflows so the setup guide can recommend the right n8n import later.

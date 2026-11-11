@@ -1,4 +1,4 @@
-import type { Access, CollectionConfig } from 'payload'
+import { APIError, type Access, type CollectionConfig, type TextField } from 'payload'
 
 import { authenticated } from '@/access/authenticated'
 import { checkRole } from '@/access/utilities'
@@ -8,6 +8,17 @@ import type { User } from '@/payload-types'
 const adminOnly: Access = ({ req: { user } }) => checkRole(['Admin'], user as User | null | undefined)
 const adminFieldAccess = ({ req }: { req: { user?: unknown } }) =>
   checkRole(['Admin'], req.user as User | null | undefined)
+
+const apiKeyHooks: TextField['hooks'] = {
+  beforeChange: [
+    ({ req, value }) => {
+      if (typeof value !== 'string') return value
+      const apiKey = value.trim()
+      return apiKey ? req.payload.encrypt(apiKey) : ''
+    },
+  ],
+  afterRead: [({ req, value }) => (value ? req.payload.decrypt(value) : value)],
+}
 
 export const PayloadSites: CollectionConfig = {
   slug: 'payload-sites',
@@ -40,6 +51,24 @@ export const PayloadSites: CollectionConfig = {
     schemaProfileStatus: true,
     slug: true,
     writeBackEnabled: true,
+  },
+  hooks: {
+    beforeValidate: [
+      ({ data, originalDoc }) => {
+        const apiKey = data?.apiKey === undefined ? originalDoc?.apiKey : data.apiKey
+        const legacyReference =
+          data?.apiKeySecretReference === undefined
+            ? originalDoc?.apiKeySecretReference
+            : data.apiKeySecretReference
+        const hasAPIKey = typeof apiKey === 'string' && apiKey.trim().length > 0
+        const hasLegacyReference =
+          typeof legacyReference === 'string' && legacyReference.trim().length > 0
+        if (!hasAPIKey && !hasLegacyReference) {
+          throw new APIError('A Payload API key is required.', 400)
+        }
+        return data
+      },
+    ],
   },
   fields: [
     {
@@ -97,34 +126,50 @@ export const PayloadSites: CollectionConfig = {
       },
     },
     {
-      name: 'apiKeySecretReference',
+      name: 'apiKey',
       type: 'text',
-      required: true,
+      label: 'Payload API Key',
       access: {
+        create: adminFieldAccess,
         read: adminFieldAccess,
         update: adminFieldAccess,
       },
+      hooks: apiKeyHooks,
       admin: {
         components: {
           Field: '@/components/Admin/SecretTextField#SecretTextField',
         },
-        description: 'Environment variable name containing the target Payload API key.',
+        description: 'API key from the target Payload site. Required for new sites.',
       },
+    },
+    {
+      name: 'n8nReadAPIKey',
+      type: 'text',
+      label: 'n8n Read-Only Payload API Key',
+      access: {
+        create: adminFieldAccess,
+        read: adminFieldAccess,
+        update: adminFieldAccess,
+      },
+      hooks: apiKeyHooks,
+      admin: {
+        components: {
+          Field: '@/components/Admin/SecretTextField#SecretTextField',
+        },
+        description: 'Optional read-only API key from the target Payload site.',
+      },
+    },
+    {
+      name: 'apiKeySecretReference',
+      type: 'text',
+      access: { read: adminFieldAccess, update: adminFieldAccess },
+      admin: { hidden: true },
     },
     {
       name: 'n8nReadAPIKeySecretReference',
       type: 'text',
-      access: {
-        read: adminFieldAccess,
-        update: adminFieldAccess,
-      },
-      admin: {
-        components: {
-          Field: '@/components/Admin/SecretTextField#SecretTextField',
-        },
-        description:
-          'Optional n8n credential name or secret reference for a separate read-only Payload API key on this target site.',
-      },
+      access: { read: adminFieldAccess, update: adminFieldAccess },
+      admin: { hidden: true },
     },
     {
       name: 'schemaProfileEndpoint',
