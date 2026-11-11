@@ -31,15 +31,24 @@ export const fetchSchemaProfile = async (site: PayloadSiteConfig) => {
   })
 
   if (response.redirected && new URL(response.url).origin !== new URL(endpoint).origin) {
-    throw new APIError('The schema profile request redirected to another origin. Use the target site’s final Base URL.', 502)
+    throw new APIError(
+      'The schema profile request redirected to another origin. Use the final target site origin as the Base URL.',
+      502,
+    )
   }
 
   if (!response.ok) {
     if (response.status === 404) {
-      throw new APIError('Schema profile endpoint returned 404. Check the endpoint path and confirm the companion plugin is registered on the deployed target site.', 404)
+      throw new APIError(
+        'Schema profile endpoint returned 404. Check the endpoint path and confirm the companion plugin is registered on the deployed target site.',
+        404,
+      )
     }
     if (response.status === 401 || response.status === 403) {
-      throw new APIError(`Schema profile endpoint returned ${response.status}. Check the saved API key, its auth collection slug, and the target endpoint permissions.`, response.status)
+      throw new APIError(
+        `Schema profile endpoint returned ${response.status}. Check the saved API key, its auth collection slug, and the target endpoint permissions.`,
+        response.status,
+      )
     }
     throw new APIError(`Payload site schema profile request failed with ${response.status}.`, response.status)
   }

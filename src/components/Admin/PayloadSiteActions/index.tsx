@@ -26,7 +26,7 @@ const getFieldValue = (fields: Record<string, { value?: unknown }>, name: string
 
 export const PayloadSiteActionsField: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo()
-  const { dispatchFields } = useForm()
+  const { dispatchFields, getFields } = useForm()
   const [checking, setChecking] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [accepting, setAccepting] = useState(false)
@@ -61,15 +61,15 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
         const status = data.schemaProfileStatus || data.payloadSite?.schemaProfileStatus
         const hash = data.payloadSite?.schemaProfileHash
 
-        for (const [path, value] of Object.entries({
+        const fields = getFields()
+        const updatedFields = Object.entries({
           companionPluginStatus: companionStatus,
           schemaProfileHash: hash,
           schemaProfileStatus: status,
-        })) {
-          if (value !== undefined) {
-            dispatchFields({ initialValue: value, path, type: 'UPDATE', value })
-          }
-        }
+        })
+          .filter(([path, value]) => fields[path] && value !== undefined)
+          .map(([path, value]) => [path, { ...fields[path], initialValue: value, value }])
+        dispatchFields({ formState: Object.fromEntries(updatedFields), type: 'UPDATE_MANY' })
 
         if (!response.ok || data.ok === false) {
           throw new Error(data.error || data.errors?.[0]?.message || 'Payload site setup action failed.')
@@ -93,7 +93,7 @@ export const PayloadSiteActionsField: UIFieldClientComponent = () => {
         else setChecking(false)
       }
     },
-    [dispatchFields, id],
+    [dispatchFields, getFields, id],
   )
 
   return (
