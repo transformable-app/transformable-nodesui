@@ -171,6 +171,7 @@ export const Agents: CollectionConfig = {
       name: 'outputBinding',
       type: 'json',
       admin: {
+        components: { Field: '@/components/Admin/OutputBindingField#OutputBindingField' },
         description:
           'Default target binding for CMS draft output. Plan and task bindings can narrow this per run.',
       },

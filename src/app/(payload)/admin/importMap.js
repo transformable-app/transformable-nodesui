@@ -18,6 +18,7 @@ import { FolderTableCell as FolderTableCell_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 import { FolderField as FolderField_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { SecretTextField as SecretTextField_b5312cfa21a62ab50ba1e5de9860babd } from '@/components/Admin/SecretTextField'
 import { AgentSetupGuideField as AgentSetupGuideField_af73eba3bb4fb6fbf4e0a0b60d1009a5 } from '@/components/Admin/AgentSetupGuide'
+import { OutputBindingField as OutputBindingField_6bc42923b4bde4bba8d1e57bb590a4de } from '@/components/Admin/OutputBindingField'
 import { PayloadSiteActionsField as PayloadSiteActionsField_53c33f221cb2973f44d2eece84f04935 } from '@/components/Admin/PayloadSiteActions'
 import { FolderTypeField as FolderTypeField_2b8867833a34864a02ddf429b0728a40 } from '@payloadcms/next/client'
 import { RowLabel as RowLabel_ec255a65fa6fa8d1faeb09cf35284224 } from '@/Header/RowLabel'
@@ -52,6 +53,7 @@ export const importMap = {
   "@payloadcms/next/rsc#FolderField": FolderField_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@/components/Admin/SecretTextField#SecretTextField": SecretTextField_b5312cfa21a62ab50ba1e5de9860babd,
   "@/components/Admin/AgentSetupGuide#AgentSetupGuideField": AgentSetupGuideField_af73eba3bb4fb6fbf4e0a0b60d1009a5,
+  "@/components/Admin/OutputBindingField#OutputBindingField": OutputBindingField_6bc42923b4bde4bba8d1e57bb590a4de,
   "@/components/Admin/PayloadSiteActions#PayloadSiteActionsField": PayloadSiteActionsField_53c33f221cb2973f44d2eece84f04935,
   "@payloadcms/next/client#FolderTypeField": FolderTypeField_2b8867833a34864a02ddf429b0728a40,
   "@/Header/RowLabel#RowLabel": RowLabel_ec255a65fa6fa8d1faeb09cf35284224,

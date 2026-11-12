@@ -66,6 +66,7 @@ export const AgentPlans: CollectionConfig = {
       name: 'outputBinding',
       type: 'json',
       admin: {
+        components: { Field: '@/components/Admin/OutputBindingField#OutputBindingField' },
         description:
           'Default CMS draft target binding inherited by cms-draft tasks unless a task overrides it.',
       },

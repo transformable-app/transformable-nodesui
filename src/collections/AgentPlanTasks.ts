@@ -70,6 +70,7 @@ export const AgentPlanTasks: CollectionConfig = {
       name: 'outputBinding',
       type: 'json',
       admin: {
+        components: { Field: '@/components/Admin/OutputBindingField#OutputBindingField' },
         description:
           'Explicit CMS draft target binding enforced before remote Payload API writes.',
       },
