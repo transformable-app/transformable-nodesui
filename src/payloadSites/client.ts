@@ -97,15 +97,35 @@ export const writeDraftDocument = async ({
     method: operation === 'create' ? 'POST' : 'PATCH',
   })
 
-  const body = await readJSON(response)
-
   if (!response.ok) {
+    const fallback = `Payload site draft write failed with ${response.status}.`
+    if (response.status >= 500) {
+      throw new APIError(`${fallback} Check the target Payload server logs for the failed request.`, response.status)
+    }
+
+    const body = await readJSON(response).catch(() => null)
+    const fieldPaths =
+      body && typeof body === 'object' && 'errors' in body && Array.isArray(body.errors)
+        ? body.errors.flatMap((error) =>
+            Array.isArray(error?.data?.errors)
+              ? error.data.errors
+                  .map((field: { path?: unknown }) => field?.path)
+                  .filter((path: unknown): path is string =>
+                    typeof path === 'string' && /^[\w.[\]-]{1,160}$/.test(path),
+                  )
+              : [],
+          ).slice(0, 10)
+        : []
     const message =
-      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+      fieldPaths.length
+        ? `${fallback} Invalid fields: ${fieldPaths.join(', ')}.`
+        : body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
         ? body.error
-        : `Payload site draft write failed with ${response.status}.`
+        : fallback
     throw new APIError(message, response.status)
   }
+
+  const body = await readJSON(response)
 
   if (!body || typeof body !== 'object') {
     throw new APIError('Payload site draft write returned an empty response.', 502)

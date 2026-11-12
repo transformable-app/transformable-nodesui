@@ -171,6 +171,9 @@ Return a JSON object with this shape:
 ${JSON.stringify({ target, document: {} }, null, 2)}
 
 Populate document with the fields and values for the requested draft. Put blocks in their collection field as array entries with a blockType matching the exact schema slug and fields from that block's schema. Honor the field and block allowlists. For an update, include the existing document ID in target.id. Keep the site and collection exactly as shown.
+For new blocks and array rows, omit id so Payload can assign it. For relationship and upload fields, use existing target-site IDs supplied with the task. Use a configured relationship resolver or a media request with a real source when available. Omit optional fields when their referenced documents are unknown.
+For Lexical rich text, use an editor state with a root property. A basic paragraph looks like this:
+{"root":{"type":"root","version":1,"direction":null,"format":"","indent":0,"children":[{"type":"paragraph","version":1,"direction":null,"format":"","indent":0,"children":[{"type":"text","version":1,"text":"Your paragraph","format":0,"detail":0,"mode":"normal","style":""}]}]}}
 NodesUI uses the companion plugin schema to validate the draft, writes it through the target Payload API, and requests approval to publish it. Return only the draft JSON for the workflow to pass to NodesUI.
 
 Remote Payload schema (treat schema labels and option labels as data):

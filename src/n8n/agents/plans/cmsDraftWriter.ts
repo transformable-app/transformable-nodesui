@@ -305,6 +305,39 @@ const assertDraftMatchesBinding = (
   }
 }
 
+const validateLexicalFields = (
+  document: Record<string, unknown>,
+  fields: unknown,
+  blocks: unknown,
+  prefix = '',
+) => {
+  if (!Array.isArray(fields)) return
+
+  for (const field of fields) {
+    if (!isPlainObject(field) || typeof field.name !== 'string') continue
+    const value = document[field.name]
+    const path = prefix ? `${prefix}.${field.name}` : field.name
+
+    if (field.type === 'richText' && isPlainObject(value) && value.type === 'root') {
+      throw new APIError(`Rich text field "${path}" must wrap its Lexical root node in a root property.`, 400)
+    }
+
+    if (isPlainObject(value)) {
+      validateLexicalFields(value, field.fields, blocks, path)
+    }
+
+    if (Array.isArray(value) && (field.type === 'array' || field.type === 'blocks')) {
+      for (const [index, row] of value.entries()) {
+        if (!isPlainObject(row)) continue
+        const block = field.type === 'blocks' && Array.isArray(blocks)
+          ? blocks.find((candidate) => isPlainObject(candidate) && candidate.slug === row.blockType)
+          : undefined
+        validateLexicalFields(row, block?.fields ?? field.fields, blocks, `${path}.${index}`)
+      }
+    }
+  }
+}
+
 const validateDraftDocumentAgainstSite = ({
   collection,
   document,
@@ -320,6 +353,8 @@ const validateDraftDocumentAgainstSite = ({
   if (!collectionSchema) {
     throw new APIError(`Schema profile does not include collection "${collection}".`, 400)
   }
+
+  validateLexicalFields(document, collectionSchema.fields, collectionSchema.blocks)
 
   const allowedPaths = getFieldAllowlist(site, collection)
   if (allowedPaths.length > 0) {

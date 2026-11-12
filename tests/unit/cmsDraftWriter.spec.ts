@@ -150,6 +150,41 @@ describe('cms-draft remote writer', () => {
     mockedReadFile.mockResolvedValue(Buffer.from('image'))
   })
 
+  it('rejects an unwrapped Lexical root inside a block before posting the draft', async () => {
+    const req = makeReq(makeSite({
+      fieldAllowlists: [],
+      schemaProfile: {
+        collections: [{
+          slug: 'pages',
+          fields: [{ name: 'layout', type: 'blocks' }],
+          blocks: [{
+            slug: 'content',
+            fields: [{
+              name: 'columns',
+              type: 'array',
+              fields: [{ name: 'richText', type: 'richText' }],
+            }],
+          }],
+        }],
+      },
+    }))
+
+    await expect(writeCMSDraftFromTaskOutput({
+      output: output({
+        document: {
+          layout: [{ blockType: 'content', columns: [{ richText: { type: 'root', children: [] } }] }],
+        },
+      }),
+      outputBinding: targetOnlyOutputBinding,
+      req: req as never,
+      runID: 'run-1',
+    })).rejects.toMatchObject({
+      message: 'Rich text field "layout.0.columns.0.richText" must wrap its Lexical root node in a root property.',
+      retryable: true,
+    })
+    expect(mockedWriteDraftDocument).not.toHaveBeenCalled()
+  })
+
   it('writes a remote draft and records reviewable admin and preview URLs', async () => {
     const req = makeReq(makeSite())
 
