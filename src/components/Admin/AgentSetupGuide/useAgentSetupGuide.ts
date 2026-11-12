@@ -8,7 +8,6 @@ import type { AgentSetupGuideResponse } from '@/n8n/agents/testAgentSetup'
 export type AgentSetupGuideRequest = {
   agentID?: string
   endpointPath?: string
-  secretReference?: string
   serverID?: string
   slug?: string
   syncWorkflows?: boolean

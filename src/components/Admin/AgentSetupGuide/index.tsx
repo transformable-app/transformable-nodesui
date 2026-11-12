@@ -27,7 +27,6 @@ export const AgentSetupGuideField: UIFieldClientComponent = () => {
 
   const formValues = useFormFields(([fields]) => ({
     endpointPath: getFieldValue(fields, 'endpointPath'),
-    secretReference: getFieldValue(fields, 'secretReference'),
     server: getFieldValue(fields, 'server'),
     slug: getFieldValue(fields, 'slug'),
     transport: getFieldValue(fields, 'transport'),
@@ -38,8 +37,6 @@ export const AgentSetupGuideField: UIFieldClientComponent = () => {
     (sync = false): AgentSetupGuideRequest => ({
       agentID: id ? String(id) : undefined,
       endpointPath: typeof formValues.endpointPath === 'string' ? formValues.endpointPath : undefined,
-      secretReference:
-        typeof formValues.secretReference === 'string' ? formValues.secretReference : undefined,
       serverID: getRelationID(formValues.server),
       slug: typeof formValues.slug === 'string' ? formValues.slug : undefined,
       syncWorkflows: sync,
@@ -67,7 +64,7 @@ export const AgentSetupGuideField: UIFieldClientComponent = () => {
   return (
     <div className="agentSetupGuide__field">
       <p className="agentSetupGuide__field-copy">
-        Every agent needs a matching production workflow in n8n. Open the setup guide for env vars,
+        Every agent needs a matching production workflow in n8n. Open the setup guide for invocation auth,
         webhook steps, sync checks, and Agent Chat block testing guidance.
       </p>
       <button

@@ -28,7 +28,6 @@ const setupGuideHandler: Endpoint['handler'] = async (req) => {
   const serverID = getString(body.serverID) || url.searchParams.get('serverID') || undefined
   const workflowID = getString(body.workflowID) || undefined
   const endpointPath = getString(body.endpointPath) || url.searchParams.get('endpointPath') || undefined
-  const secretReference = getString(body.secretReference) || undefined
   const slug = getString(body.slug) || undefined
   const transport =
     body.transport === 'chat-trigger' || body.transport === 'webhook' ? body.transport : undefined
@@ -39,7 +38,6 @@ const setupGuideHandler: Endpoint['handler'] = async (req) => {
     agentID,
     endpointPath,
     req,
-    secretReference,
     serverID,
     slug,
     syncWorkflows,

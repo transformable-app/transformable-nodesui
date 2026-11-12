@@ -557,6 +557,15 @@ const resolveRelationshipValues = async ({
 }
 
 const parseCMSDraftOutput = (value: unknown): CMSDraftOutput => {
+  if (typeof value === 'string') {
+    const json = value.trim().match(/^```(?:json)?\s+([\s\S]*?)\s*```$/i)?.[1] ?? value
+    try {
+      value = JSON.parse(json)
+    } catch {
+      throw new APIError('CMS draft output must be a JSON object.', 400)
+    }
+  }
+
   if (!isPlainObject(value)) {
     throw new APIError('CMS draft output must be an object.', 400)
   }

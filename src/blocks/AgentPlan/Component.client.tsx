@@ -69,9 +69,34 @@ const safeJSON = (value: string) => {
   return JSON.parse(value) as Record<string, unknown>
 }
 
+const getAgentTarget = (agent: AgentOption | undefined, sites: PayloadSiteOption[]) => {
+  const value = agent?.outputBinding
+  const binding = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+  const savedSite = sites.find(({ id, slug }) => binding?.payloadSite === id || binding?.payloadSite === slug)
+  const site = typeof binding?.payloadSite === 'string' && binding.payloadSite ? savedSite : sites[0]
+  const collection = savedSite && typeof binding?.collection === 'string' &&
+    savedSite.allowedCollections.includes(binding.collection)
+    ? binding.collection
+    : site?.allowedCollections[0] ?? ''
+  const defaults = savedSite && collection === binding?.collection ? binding : undefined
+
+  return {
+    binding: defaults,
+    collection,
+    siteID: site?.slug || site?.id || '',
+  }
+}
+
+const formatAllowlist = (value: unknown) => Array.isArray(value) ? value.join('\n') : ''
+const formatResolvers = (value: unknown) =>
+  Array.isArray(value) ? JSON.stringify({ relationshipResolvers: value }, null, 2) : ''
+
 export function AgentPlanClient({ agents, description, payloadSites, title }: Props) {
   const [agentID, setAgentID] = useState(agents[0]?.slug ?? agents[0]?.id ?? '')
-  const [siteID, setSiteID] = useState(payloadSites[0]?.slug ?? payloadSites[0]?.id ?? '')
+  const initialTarget = getAgentTarget(agents[0], payloadSites)
+  const [siteID, setSiteID] = useState(initialTarget.siteID)
   const selectedSite = useMemo(
     () => payloadSites.find((site) => site.slug === siteID || site.id === siteID),
     [payloadSites, siteID],
@@ -80,14 +105,14 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
     () => agents.find((agent) => agent.slug === agentID || agent.id === agentID),
     [agentID, agents],
   )
-  const [collection, setCollection] = useState(selectedSite?.allowedCollections[0] || 'pages')
+  const [collection, setCollection] = useState(initialTarget.collection)
   const [planTitle, setPlanTitle] = useState('Generate CMS draft')
   const [objective, setObjective] = useState('')
   const [taskTitle, setTaskTitle] = useState('Draft page')
   const [instructions, setInstructions] = useState('')
-  const [allowedFields, setAllowedFields] = useState('title\nlayout\nlayout.*')
-  const [allowedBlocks, setAllowedBlocks] = useState('')
-  const [relationshipResolvers, setRelationshipResolvers] = useState('')
+  const [allowedFields, setAllowedFields] = useState(formatAllowlist(initialTarget.binding?.allowedFields))
+  const [allowedBlocks, setAllowedBlocks] = useState(formatAllowlist(initialTarget.binding?.allowedBlocks))
+  const [relationshipResolvers, setRelationshipResolvers] = useState(formatResolvers(initialTarget.binding?.relationshipResolvers))
   const [demoApproval, setDemoApproval] = useState(false)
   const [plan, setPlan] = useState<PlanState | null>(null)
   const [tasks, setTasks] = useState<PlanTask[]>([])
@@ -184,6 +209,22 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
     }
   }
 
+  const changeAgent = (id: string) => {
+    const target = getAgentTarget(agents.find((agent) => agent.slug === id || agent.id === id), payloadSites)
+    setAgentID(id)
+    setSiteID(target.siteID)
+    setCollection(target.collection)
+    setAllowedFields(formatAllowlist(target.binding?.allowedFields))
+    setAllowedBlocks(formatAllowlist(target.binding?.allowedBlocks))
+    setRelationshipResolvers(formatResolvers(target.binding?.relationshipResolvers))
+  }
+
+  const clearTargetOptions = () => {
+    setAllowedFields('')
+    setAllowedBlocks('')
+    setRelationshipResolvers('')
+  }
+
   const submitPlan = async () => {
     setError(null)
     setIsSubmitting(true)
@@ -197,7 +238,13 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
         .split(/\r?\n|,/)
         .map((item) => item.trim())
         .filter(Boolean)
+      const agentTarget = getAgentTarget(selectedAgent, payloadSites)
+      const defaults = agentTarget.siteID === siteID && agentTarget.collection === collection
+        ? agentTarget.binding
+        : undefined
       const outputBinding = {
+        fieldMappings: defaults?.fieldMappings,
+        operation: defaults?.operation ?? 'create',
         allowedBlocks: blockList.length ? blockList : undefined,
         allowedFields: fieldList.length ? fieldList : undefined,
         collection,
@@ -219,7 +266,6 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
             id: 'draft',
             input: demoApproval ? { demoApproval: true } : undefined,
             instructions,
-            outputBinding,
             requiresApproval: false,
             riskLevel: 'medium',
             title: taskTitle,
@@ -277,7 +323,7 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
             <select
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               id="agent-plan-agent"
-              onChange={(event) => setAgentID(event.target.value)}
+              onChange={(event) => changeAgent(event.target.value)}
               value={agentID}
             >
               {agents.map((agent) => (
@@ -292,9 +338,13 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
             <select
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               id="agent-plan-site"
-              onChange={(event) => setSiteID(event.target.value)}
+              onChange={(event) => {
+                setSiteID(event.target.value)
+                clearTargetOptions()
+              }}
               value={siteID}
             >
+              <option value="" disabled>Select a Payload site</option>
               {payloadSites.map((site) => (
                 <option key={site.id} value={site.slug || site.id}>
                   {site.name}
@@ -314,10 +364,13 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
             <select
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               id="agent-plan-collection"
-              onChange={(event) => setCollection(event.target.value)}
+              onChange={(event) => {
+                setCollection(event.target.value)
+                clearTargetOptions()
+              }}
               value={collection}
             >
-              {(selectedSite?.allowedCollections.length ? selectedSite.allowedCollections : ['pages']).map((item) => (
+              {(selectedSite?.allowedCollections ?? []).map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
@@ -397,7 +450,7 @@ export function AgentPlanClient({ agents, description, payloadSites, title }: Pr
         {error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
 
         <div className="flex flex-wrap gap-2">
-          <Button disabled={!selectedAgent || !selectedSite || isSubmitting} onClick={submitPlan} type="button">
+          <Button disabled={!selectedAgent || !selectedSite || !selectedSite.allowedCollections.includes(collection) || isSubmitting} onClick={submitPlan} type="button">
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Start plan
           </Button>

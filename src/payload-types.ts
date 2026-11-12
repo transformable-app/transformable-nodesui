@@ -542,8 +542,10 @@ export interface Agent {
   endpointPath: string;
   authStrategy: 'server-secret' | 'header' | 'jwt';
   /**
-   * Environment variable name resolved server-side for n8n invocation auth.
+   * Enter the bearer token configured in n8n. Leave blank to keep the current secret.
    */
+  invocationSecret?: string | null;
+  encryptedInvocationSecret?: string | null;
   secretReference?: string | null;
   /**
    * Non-admin users need one of these roles to invoke this agent.
@@ -2460,6 +2462,8 @@ export interface AgentsSelect<T extends boolean = true> {
   transport?: T;
   endpointPath?: T;
   authStrategy?: T;
+  invocationSecret?: T;
+  encryptedInvocationSecret?: T;
   secretReference?: T;
   allowedRoles?: T;
   inputMode?: T;

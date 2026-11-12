@@ -1,4 +1,4 @@
-import type { CollectionConfig, Where } from 'payload'
+import { APIError, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
 
 import { adminAuthenticatedAndNotContentManager } from '@/access/contentManagerRestrictions'
 import { checkRole } from '@/access/utilities'
@@ -13,6 +13,9 @@ const getRoleID = (value: unknown): string | null => {
 
   return null
 }
+
+const canManageSecret = ({ req }: { req: PayloadRequest }) =>
+  checkRole(['Admin'], req.user)
 
 export const Agents: CollectionConfig = {
   slug: 'agents',
@@ -41,6 +44,25 @@ export const Agents: CollectionConfig = {
       return constraint
     },
     update: adminAuthenticatedAndNotContentManager,
+  },
+  hooks: {
+    beforeChange: [
+      ({ data, req }) => {
+        const secret = data.invocationSecret
+        delete data.invocationSecret
+
+        if (secret == null || (typeof secret === 'string' && !secret.trim())) return data
+
+        if (typeof secret !== 'string' || !/^[!-~]+$/.test(secret.trim())) {
+          throw new APIError('Enter a valid bearer token without spaces.', 400)
+        }
+
+        data.encryptedInvocationSecret = req.payload.encrypt(secret.trim())
+        data.secretReference = null
+
+        return data
+      },
+    ],
   },
   admin: {
     defaultColumns: ['name', 'server', 'workflow', 'transport', 'enabled'],
@@ -134,11 +156,28 @@ export const Agents: CollectionConfig = {
       required: true,
     },
     {
+      name: 'invocationSecret',
+      label: 'Invocation Secret',
+      type: 'text',
+      virtual: true,
+      access: { create: canManageSecret, read: canManageSecret, update: canManageSecret },
+      admin: {
+        autoComplete: 'new-password',
+        components: { Field: '@/components/Admin/SecretTextField#SecretTextField' },
+        description: 'Enter the bearer token configured in n8n. Leave blank to keep the current secret.',
+      },
+    },
+    {
+      name: 'encryptedInvocationSecret',
+      type: 'text',
+      hidden: true,
+      access: { create: () => false, read: () => false, update: () => false },
+    },
+    {
       name: 'secretReference',
       type: 'text',
-      admin: {
-        description: 'Environment variable name resolved server-side for n8n invocation auth.',
-      },
+      hidden: true,
+      access: { create: () => false, read: () => false, update: () => false },
     },
     {
       name: 'allowedRoles',

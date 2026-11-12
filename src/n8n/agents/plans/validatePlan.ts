@@ -18,7 +18,12 @@ import {
 
 export type AgentPlanValidationResult =
   | { errors: string[]; ok: false }
-  | { plan: NormalizedAgentPlanInput; redactedPlan: NormalizedAgentPlanInput; ok: true }
+  | {
+      ok: true
+      plan: NormalizedAgentPlanInput
+      redactedPlan: NormalizedAgentPlanInput
+      taskOutputBindings: Map<string, AgentPlanOutputBinding | undefined>
+    }
 
 const TASK_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/
 
@@ -44,7 +49,7 @@ const cleanStringArray = (value: unknown): string[] | undefined =>
     ? value.map(cleanString).filter((item): item is string => Boolean(item))
     : undefined
 
-const normalizeOutputBinding = ({
+export const normalizeOutputBinding = ({
   errors,
   label,
   value,
@@ -315,7 +320,13 @@ const addDependencyErrors = (tasks: AgentPlanTaskInput[], errors: string[]) => {
   }
 }
 
-export const validateAgentPlanInput = (input: unknown): AgentPlanValidationResult => {
+export const getPlanAgentReference = (input: unknown) =>
+  isPlainObject(input) ? cleanString(input.agent) : null
+
+export const validateAgentPlanInput = (
+  input: unknown,
+  defaultOutputBinding?: unknown,
+): AgentPlanValidationResult => {
   const errors: string[] = []
 
   if (!isPlainObject(input)) return { errors: ['Plan must be an object.'], ok: false }
@@ -349,10 +360,14 @@ export const validateAgentPlanInput = (input: unknown): AgentPlanValidationResul
 
   addDependencyErrors(tasks, errors)
 
+  const needsDefaultBinding = tasks.some((task) => task.expectedOutput?.type === 'cms-draft' && !task.outputBinding)
   const outputBinding = normalizeOutputBinding({
     errors,
     label: 'outputBinding',
-    value: input.outputBinding,
+    value:
+      input.outputBinding === undefined && needsDefaultBinding
+        ? defaultOutputBinding ?? undefined
+        : input.outputBinding,
   })
 
   for (const [index, task] of tasks.entries()) {
@@ -440,6 +455,7 @@ export const validateAgentPlanInput = (input: unknown): AgentPlanValidationResul
   return {
     ok: true,
     plan: normalizedPlan,
+    taskOutputBindings: new Map(tasks.map(({ id, outputBinding }) => [id, outputBinding])),
     redactedPlan: redactValue(normalizedPlan) as NormalizedAgentPlanInput,
   }
 }

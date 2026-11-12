@@ -39,9 +39,9 @@ Used by the **Webhook** node on every sample workflow.
 | --- | --- |
 | Type | Header Auth |
 | Name | `Authorization` (header name) |
-| Value | `Bearer <same value as TEST_AGENT_WEBHOOK_SECRET on Payload>` |
+| Value | `Bearer <value saved in Invocation Secret>` |
 
-Example: if Payload has `TEST_AGENT_WEBHOOK_SECRET=replace-me`, set the credential value to `Bearer replace-me`.
+If you save `replace-me` in **Invocation Secret**, set the n8n credential value to `Bearer replace-me`.
 
 The harness sends `Authorization: Bearer …` on every invocation. The value must match exactly.
 
@@ -90,7 +90,6 @@ Set this on the n8n host (Docker `environment`, systemd, etc.) so the **Callback
 
 Payload-side vars (not in these JSON files):
 
-- `TEST_AGENT_WEBHOOK_SECRET` — agent invocation
 - `N8N_CALLBACK_SECRET` — callback route auth
 
 ## Expected Response Shapes

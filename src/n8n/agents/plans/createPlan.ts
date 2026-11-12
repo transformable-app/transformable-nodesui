@@ -4,7 +4,7 @@ import { AgentHarnessError } from '@/n8n/agents/types'
 import { toPreview } from '@/n8n/agents/redact'
 
 import { runPlanLoop } from './runPlanLoop'
-import { validateAgentPlanInput } from './validatePlan'
+import { getPlanAgentReference, validateAgentPlanInput } from './validatePlan'
 
 type CreateAgentPlanArgs = {
   input: unknown
@@ -15,7 +15,7 @@ type CreateAgentPlanArgs = {
 const asPayloadJSON = (value: unknown) =>
   value as string | number | boolean | unknown[] | { [k: string]: unknown } | null | undefined
 
-const getAgentID = async ({ agent, req }: { agent: string; req: PayloadRequest }) => {
+export const loadPlanAgent = async ({ agent, req }: { agent: string; req: PayloadRequest }) => {
   const byID = await req.payload
     .findByID({
       collection: 'agents',
@@ -27,7 +27,7 @@ const getAgentID = async ({ agent, req }: { agent: string; req: PayloadRequest }
     })
     .catch(() => null)
 
-  if (byID) return String(byID.id)
+  if (byID) return byID
 
   const bySlug = await req.payload.find({
     collection: 'agents',
@@ -44,7 +44,7 @@ const getAgentID = async ({ agent, req }: { agent: string; req: PayloadRequest }
     throw new AgentHarnessError('not-found', 'Agent not found or not available.', 404)
   }
 
-  return String(found.id)
+  return found
 }
 
 const toSlug = (value: string) =>
@@ -58,12 +58,15 @@ const toSlug = (value: string) =>
 export const createAgentPlan = async ({ input, req, start = false }: CreateAgentPlanArgs) => {
   if (!req.user) throw new AgentHarnessError('auth', 'Unauthorized.', 401)
 
-  const validation = validateAgentPlanInput(input)
+  const reference = getPlanAgentReference(input)
+  const agent = reference ? await loadPlanAgent({ agent: reference, req }) : undefined
+  const validation = validateAgentPlanInput(input, agent?.outputBinding)
   if (!validation.ok) {
     throw new AgentHarnessError('input-validation', validation.errors.join(' '), 400)
   }
 
-  const agentID = await getAgentID({ agent: validation.plan.agent, req })
+  if (!agent) throw new AgentHarnessError('not-found', 'Agent not found or not available.', 404)
+  const agentID = String(agent.id)
   const now = new Date().toISOString()
   const plan = await req.payload.create({
     collection: 'agent-plans',
@@ -97,7 +100,7 @@ export const createAgentPlan = async ({ input, req, start = false }: CreateAgent
         data: {
           dependsOn: task.dependsOn.map((dependencyID) => ({ taskID: dependencyID })),
           expectedOutput: asPayloadJSON(task.expectedOutput),
-          outputBinding: asPayloadJSON(task.outputBinding),
+          outputBinding: asPayloadJSON(validation.taskOutputBindings.get(task.id)),
           createdBy: req.user.id,
           attempts: 0,
           inputPreview: toPreview(task.input ?? {}, 8000),

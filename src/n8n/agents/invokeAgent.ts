@@ -1,3 +1,4 @@
+import { getAgentInvocationSecret } from '@/n8n/agents/invocationSecret'
 import { randomUUID } from 'crypto'
 import * as Sentry from '@sentry/nextjs'
 
@@ -735,6 +736,7 @@ export const sendAgentMessage = async ({
   try {
     const response = await invokeN8nAgent({
       agent: resolved.agent,
+      secret: await getAgentInvocationSecret(req, String(resolved.agent.id)),
       invocation: {
         actor: {
           id: req.user.id,
@@ -1038,6 +1040,7 @@ export const streamAgentMessage = async ({
       try {
         const upstream = await invokeN8nAgentStream({
           agent: resolved.agent,
+          secret: await getAgentInvocationSecret(req, String(resolved.agent.id)),
           invocation: {
             actor: {
               id: req.user.id,

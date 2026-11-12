@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildChatTriggerBody, parseChatTriggerResponse } from '@/n8n/agents/chatTriggerAdapter'
 import { assertSameServerURL, buildAgentEndpoint } from '@/n8n/agents/buildEndpoint'
-import { invokeN8nAgent } from '@/n8n/agents/adapters'
+import { invokeN8nAgent, invokeN8nAgentStream } from '@/n8n/agents/adapters'
 import { buildWebhookBody, parseWebhookResponse } from '@/n8n/agents/webhookAdapter'
 import type { AgentInvocation } from '@/n8n/agents/types'
 
@@ -55,6 +55,17 @@ describe('agent transport adapters', () => {
       n8nExecutionID: 'exec-1',
       status: 'succeeded',
     })
+  })
+
+  it('preserves CMS draft task data and structured Chat Trigger output', () => {
+    const target = { collection: 'pages', operation: 'create', payloadSite: 'saved-site' }
+    const draft = { document: { title: 'New page', layout: [{ blockType: 'content' }] }, target }
+    const input = { expectedOutput: { type: 'cms-draft' }, outputBinding: target }
+
+    expect(buildChatTriggerBody({ ...invocation, input: { ...invocation.input, data: input } }))
+      .toMatchObject({ metadata: { input } })
+    expect(parseChatTriggerResponse({ output: draft }).data).toEqual(draft)
+    expect(parseWebhookResponse(draft).data).toEqual(draft)
   })
 
   it('normalizes webhook waiting responses', () => {
@@ -128,6 +139,22 @@ describe('agent transport adapters', () => {
         targetURL: 'https://attacker.example.com/webhook-waiting/resume/abc',
       }),
     ).toThrow('configured server')
+  })
+
+  it.each([invokeN8nAgent, invokeN8nAgentStream])('sends the supplied bearer token with %s', async (invoke) => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('ok'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await invoke({
+      agent: { endpointPath: '/webhook/test-agent', transport: 'webhook' },
+      invocation,
+      secret: 'test-bearer-token',
+      server: { baseURL: 'https://n8n.example.com' },
+    })
+
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer test-bearer-token',
+    )
   })
 
   it('retries transient fetch failures before wrapping as workflow errors', async () => {

@@ -7,14 +7,13 @@ This guide verifies the agent harness: agent registration, authenticated session
 - Run the app with Node 22 for local validation. Node 20 can hit the current `undici` runtime mismatch during Payload CLI commands.
 - Have an admin user in Payload.
 - Have at least one synced `servers` record and one synced `workflows` record, or create temporary records in the admin UI for a local test.
-- Set any invocation secret referenced by the agent:
+- For async callback tests, set the callback secret in the Payload environment.
 
 ```bash
-export TEST_AGENT_WEBHOOK_SECRET="replace-me"
 export N8N_CALLBACK_SECRET="replace-me-too"
 ```
 
-The agent `secretReference` field stores the environment variable name, for example `TEST_AGENT_WEBHOOK_SECRET`, not the secret value.
+Enter the n8n bearer token in the agent’s **Invocation Secret** field and save the agent.
 
 ## Quick Start From The Admin Dashboard
 
@@ -43,12 +42,12 @@ Expected result: both commands exit successfully.
 
 Create or choose an n8n production Webhook or Chat Trigger workflow.
 
-**Sample imports:** ready-made workflow JSON files live in [docs/n8n-workflows/](./n8n-workflows/README.md). Start with [test-agent-webhook.json](./n8n-workflows/test-agent-webhook.json) for the dashboard **Set up test agent** flow (`/webhook/test-agent`). Use [structured-plan-echo.json](./n8n-workflows/structured-plan-echo.json) for structured plan task smoke tests (`/webhook/structured-plan-echo`). After import, attach a Header Auth credential (`Authorization: Bearer <TEST_AGENT_WEBHOOK_SECRET>`), publish the workflow, sync into Payload, then run setup.
+**Sample imports:** ready-made workflow JSON files live in [docs/n8n-workflows/](./n8n-workflows/README.md). Start with [test-agent-webhook.json](./n8n-workflows/test-agent-webhook.json) for the dashboard **Set up test agent** flow (`/webhook/test-agent`). Use [structured-plan-echo.json](./n8n-workflows/structured-plan-echo.json) for structured plan task smoke tests (`/webhook/structured-plan-echo`). After import, attach a Header Auth credential (`Authorization: Bearer <invocation secret>`), publish the workflow, sync into Payload, then run setup.
 
 For the simplest synchronous Webhook test built by hand, the workflow should:
 
 - Accept `POST`.
-- Require the same bearer token as `TEST_AGENT_WEBHOOK_SECRET`.
+- Require the bearer token saved in **Invocation Secret**.
 - Return JSON:
 
 ```json
@@ -63,7 +62,7 @@ Use a production webhook path such as `/webhook/test-agent`. Do not use an absol
 
 ## Register The Agent
 
-Preferred path: use **Set up test agent** on the admin dashboard (see [Quick Start From The Admin Dashboard](#quick-start-from-the-admin-dashboard)). It upserts the canonical record with these defaults.
+Preferred path: use **Set up test agent** on the admin dashboard (see [Quick Start From The Admin Dashboard](#quick-start-from-the-admin-dashboard)). Open the test agent record, enter the bearer token in **Invocation Secret**, and save.
 
 Manual alternative: create an `Agents` record in the admin panel:
 
@@ -75,7 +74,7 @@ Manual alternative: create an `Agents` record in the admin panel:
 - `Transport`: `Webhook` or `Chat Trigger`
 - `Endpoint Path`: the relative production path, for example `/webhook/test-agent`
 - `Auth Strategy`: `Server Secret`
-- `Secret Reference`: `TEST_AGENT_WEBHOOK_SECRET`
+- `Invocation Secret`: the bearer token configured in n8n
 - `Allowed Roles`: include `User` for non-admin testing
 - `Input Mode`: `Chat`
 - `Streaming Enabled`: checked for structured SSE tests

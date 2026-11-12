@@ -3,10 +3,10 @@ import { APIError, type Endpoint } from 'payload'
 import { cancelAgentRun } from '@/n8n/agents/invokeAgent'
 import { AgentHarnessError } from '@/n8n/agents/types'
 
-import { createAgentPlan } from './createPlan'
+import { createAgentPlan, loadPlanAgent } from './createPlan'
 import { createRemoteDraftPublishApproval } from './remoteDraftApproval'
 import { runPlanLoop } from './runPlanLoop'
-import { validateAgentPlanInput } from './validatePlan'
+import { getPlanAgentReference, validateAgentPlanInput } from './validatePlan'
 
 const readBody = async (req: Parameters<Endpoint['handler']>[0]) =>
   req.json ? ((await req.json().catch(() => ({}))) as unknown) : {}
@@ -46,7 +46,10 @@ export const agentPlanCollectionEndpoints: Endpoint[] = [
     handler: async (req) => {
       try {
         requireUser(req)
-        const result = validateAgentPlanInput(await readBody(req))
+        const input = await readBody(req)
+        const reference = getPlanAgentReference(input)
+        const agent = reference ? await loadPlanAgent({ agent: reference, req }) : undefined
+        const result = validateAgentPlanInput(input, agent?.outputBinding)
 
         if (!result.ok) {
           return Response.json({ errors: result.errors, ok: false }, { status: 400 })

@@ -3,11 +3,6 @@ import { buildChatTriggerBody, parseChatTriggerResponse } from './chatTriggerAda
 import { AgentHarnessError, type AgentInvocation, type AgentInvokeResult } from './types'
 import { buildWebhookBody, parseWebhookResponse } from './webhookAdapter'
 
-const resolveSecret = (secretReference: unknown): string | null => {
-  if (typeof secretReference !== 'string' || secretReference.trim().length === 0) return null
-  return process.env[secretReference.trim()] ?? null
-}
-
 const assertSupportedAuthStrategy = (agent: Record<string, unknown>) => {
   if (!agent.authStrategy || agent.authStrategy === 'server-secret') return
 
@@ -35,10 +30,12 @@ const postWithRetry = async (endpoint: URL, init: RequestInit) => {
 export const invokeN8nAgent = async ({
   agent,
   invocation,
+  secret,
   server,
 }: {
   agent: Record<string, unknown>
   invocation: AgentInvocation
+  secret?: string | null
   server: Record<string, unknown>
 }): Promise<AgentInvokeResult> => {
   assertSupportedAuthStrategy(agent)
@@ -52,7 +49,6 @@ export const invokeN8nAgent = async ({
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMS)
   const headers = new Headers({ 'content-type': 'application/json' })
-  const secret = resolveSecret(agent.secretReference)
 
   if (secret) {
     headers.set('authorization', `Bearer ${secret}`)
@@ -116,14 +112,13 @@ const resolveTransportBody = ({
   return buildWebhookBody(invocation)
 }
 
-const buildInvocationHeaders = (agent: Record<string, unknown>) => {
+const buildInvocationHeaders = (agent: Record<string, unknown>, secret?: string | null) => {
   assertSupportedAuthStrategy(agent)
 
   const headers = new Headers({
     accept: 'text/event-stream, application/json, text/plain',
     'content-type': 'application/json',
   })
-  const secret = resolveSecret(agent.secretReference)
 
   if (secret) {
     headers.set('authorization', `Bearer ${secret}`)
@@ -135,11 +130,13 @@ const buildInvocationHeaders = (agent: Record<string, unknown>) => {
 export const invokeN8nAgentStream = async ({
   agent,
   invocation,
+  secret,
   server,
   signal,
 }: {
   agent: Record<string, unknown>
   invocation: AgentInvocation
+  secret?: string | null
   server: Record<string, unknown>
   signal?: AbortSignal
 }): Promise<Response> => {
@@ -150,7 +147,7 @@ export const invokeN8nAgentStream = async ({
 
   const response = await fetch(endpoint, {
     body: JSON.stringify(resolveTransportBody({ agent, invocation })),
-    headers: buildInvocationHeaders(agent),
+    headers: buildInvocationHeaders(agent, secret),
     method: 'POST',
     redirect: 'error',
     signal,

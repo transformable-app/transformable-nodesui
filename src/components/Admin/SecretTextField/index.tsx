@@ -112,7 +112,7 @@ const SecretTextFieldComponent: TextFieldClientComponent = ({
           />
           <button
             aria-controls={inputID}
-            aria-label={isVisible ? 'Hide API Key' : 'Show API Key'}
+            aria-label={`${isVisible ? 'Hide' : 'Show'} ${getStaticText(label) || 'secret'}`}
             className="secret-text-field__toggle"
             disabled={isDisabled}
             onClick={() => setIsVisible((visible) => !visible)}

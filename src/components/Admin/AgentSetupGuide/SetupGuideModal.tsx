@@ -102,12 +102,12 @@ export const AgentSetupGuideModal = ({
 
         <ol className="agentSetupGuide__checklist">
           <ChecklistItem
-            detail={`${result.instructions.secretReference}: ${result.checks.invocationSecretOK ? 'set' : 'missing'}. N8N_CALLBACK_SECRET: ${result.checks.callbackSecretOK ? 'set' : 'missing (optional unless testing async callbacks)'}.`}
+            detail={`${result.checks.invocationSecretOK ? 'Invocation secret is configured.' : 'Enter the bearer token in Invocation Secret and save the agent.'} N8N_CALLBACK_SECRET: ${result.checks.callbackSecretOK ? 'set' : 'missing (optional unless testing async callbacks)'}.`}
             ok={result.checks.invocationSecretOK}
-            title="Environment variables"
+            title="Invocation authentication"
           />
           <ChecklistItem
-            detail={`Import a sample workflow below, attach Header Auth matching ${result.instructions.secretReference}, publish it in n8n, and set this agent's endpoint path to match the sample (${recommendedWorkflow.endpointPath} for the default test agent). Async samples also need N8N_CALLBACK_SECRET.`}
+            detail={`Import a sample workflow below, attach Header Auth matching the agent’s invocation secret, publish it in n8n, and set this agent's endpoint path to match the sample (${recommendedWorkflow.endpointPath} for the default test agent). Async samples also need N8N_CALLBACK_SECRET.`}
             ok={result.checks.workflowOK}
             title={`n8n ${transportLabel.toLowerCase()} workflow`}
           />
@@ -125,7 +125,7 @@ export const AgentSetupGuideModal = ({
           </div>
           <p className="agentSetupGuide__samples-intro">
             Download JSON, import into n8n, attach Header Auth (
-            <code>Authorization: Bearer …</code> using {result.instructions.secretReference}),
+            <code>Authorization: Bearer …</code> using the agent’s invocation secret),
             publish the workflow, then sync workflows. Chat samples return a response immediately;
             async samples return <code>waiting</code> and need <code>N8N_CALLBACK_SECRET</code>.
             Start with <strong>{recommendedWorkflow.label}</strong> (

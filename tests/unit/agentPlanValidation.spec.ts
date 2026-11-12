@@ -138,6 +138,28 @@ describe('agent plan validation', () => {
     }
   })
 
+  it('inherits the saved agent target while preserving explicit task overrides', () => {
+    const saved = { collection: 'pages', operation: 'create', payloadSite: 'saved-site' }
+    const override = { collection: 'posts', operation: 'update', payloadSite: 'other-site' }
+    const draft = {
+      expectedOutput: { type: 'cms-draft' },
+      id: 'draft',
+      instructions: 'Draft CMS content',
+      title: 'Draft',
+    }
+    const result = validateAgentPlanInput({
+      ...validPlan,
+      tasks: [draft, { ...draft, id: 'override', outputBinding: override }],
+    }, saved)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.plan.outputBinding).toMatchObject(saved)
+    expect(result.plan.tasks[0].outputBinding).toMatchObject(saved)
+    expect(result.taskOutputBindings.get('draft')).toBeUndefined()
+    expect(result.taskOutputBindings.get('override')).toMatchObject(override)
+  })
+
   it('rejects invalid relationship resolver configuration', () => {
     const result = validateAgentPlanInput({
       ...validPlan,

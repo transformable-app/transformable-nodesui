@@ -13,7 +13,7 @@ export const parseWebhookResponse = (value: unknown): AgentInvokeResult => {
 
   const data = value as Record<string, unknown>
   const contentValue = data.content ?? data.text ?? data.output ?? data.message ?? data.response
-  const structuredData = data.data ?? data.output
+  const structuredData = data.data ?? data.output ?? (data.target && data.document ? data : undefined)
   const approval =
     data.approval && typeof data.approval === 'object' && typeof (data.approval as { resumeURL?: unknown }).resumeURL === 'string'
       ? {

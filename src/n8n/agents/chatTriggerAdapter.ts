@@ -7,6 +7,7 @@ export const buildChatTriggerBody = (invocation: AgentInvocation) => ({
   metadata: {
     actor: invocation.actor,
     context: invocation.context,
+    ...(invocation.input.data ? { input: invocation.input.data } : {}),
     requestID: invocation.requestID,
   },
   sessionId: invocation.sessionID,
@@ -22,12 +23,13 @@ export const parseChatTriggerResponse = (value: unknown): AgentInvokeResult => {
 
   const data = value as Record<string, unknown>
   const contentValue = data.output ?? data.response ?? data.message ?? data.text ?? data.content
+  const structuredData = data.data ?? data.output ?? (data.target && data.document ? data : undefined)
 
   return {
     content: typeof contentValue === 'string' ? contentValue : toPreview(contentValue ?? data),
     data:
-      typeof data.data === 'object' && data.data
-        ? (data.data as Record<string, unknown>)
+      typeof structuredData === 'object' && structuredData
+        ? (structuredData as Record<string, unknown>)
         : undefined,
     n8nExecutionID: typeof data.n8nExecutionID === 'string' ? data.n8nExecutionID : undefined,
     status: data.status === 'waiting' ? 'waiting' : 'succeeded',

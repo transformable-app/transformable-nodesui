@@ -18,7 +18,7 @@ That button calls `POST /api/agents/setup-guide` (or `POST /api/agents/:id/setup
 
 The guide checks:
 
-- Invocation secret env var (`secretReference`, for example `TEST_AGENT_WEBHOOK_SECRET`)
+- Whether the saved agent has an invocation secret
 - Optional `N8N_CALLBACK_SECRET` for async callback tests
 - Whether the linked workflow appears to expose the configured `endpointPath`
 - Whether server/workflow/agent fields are present
@@ -65,7 +65,7 @@ Create an `Agents` record in the admin panel. Fields:
 - **Transport** - `Webhook` (default, recommended for task/structured agents) or `Chat Trigger` (recommended for conversational agents).
 - **Endpoint Path** - Relative production path, for example `/webhook/agent`. Absolute URLs, `..`, `#` fragments, protocol-relative `//` paths, and n8n test paths (`/webhook-test/...`) are rejected.
 - **Auth Strategy** - `Server Secret` (default), `Header`, or `JWT`.
-- **Secret Reference** - The name of the environment variable that holds the invocation secret (for example `TEST_AGENT_WEBHOOK_SECRET`). The secret value itself is never stored on the record and is resolved server-side at call time.
+- **Invocation Secret** - The bearer token configured in n8n. Payload encrypts the token when you save. Leave the field blank to keep the current token.
 
 ### Input / Output
 

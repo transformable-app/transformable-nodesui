@@ -2,10 +2,10 @@ import type { Payload, PayloadRequest } from 'payload'
 
 import { checkRole } from '@/access/utilities'
 import type { Agent, Server, Workflow } from '@/payload-types'
+import { getAgentInvocationSecret } from './invocationSecret'
 import { syncN8nResources } from '@/n8n/sync/dataTables'
 
 export const TEST_AGENT_SLUG = 'test-agent'
-export const TEST_AGENT_SECRET_REFERENCE = 'TEST_AGENT_WEBHOOK_SECRET'
 export const DEFAULT_TEST_AGENT_ENDPOINT_PATH = '/webhook/test-agent'
 
 export const TEST_AGENT_N8N_RESPONSE_EXAMPLE = {
@@ -41,10 +41,8 @@ export type AgentSetupGuideResponse = {
   } | null
   checks: AgentSetupGuideChecks
   instructions: {
-    envVars: string[]
     n8nResponseExample: typeof TEST_AGENT_N8N_RESPONSE_EXAMPLE
     n8nWebhookPath: string
-    secretReference: string
     transport: Agent['transport']
   }
   message: string
@@ -79,21 +77,7 @@ export const normalizeEndpointPath = (endpointPath: string): string => {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
 }
 
-export const checkInvocationSecretEnv = (secretReference?: string | null): boolean => {
-  const reference = secretReference?.trim() || TEST_AGENT_SECRET_REFERENCE
-  return Boolean(process.env[reference])
-}
-
 export const checkCallbackSecretEnv = (): boolean => Boolean(process.env.N8N_CALLBACK_SECRET)
-
-/** @deprecated Use checkInvocationSecretEnv */
-export const checkTestAgentEnvVars = (): Pick<
-  AgentSetupGuideChecks,
-  'callbackSecretOK' | 'invocationSecretOK'
-> => ({
-  callbackSecretOK: checkCallbackSecretEnv(),
-  invocationSecretOK: checkInvocationSecretEnv(TEST_AGENT_SECRET_REFERENCE),
-})
 
 const normalizePathSegment = (value: string): string =>
   value.trim().replace(/^\/+|\/+$/g, '').toLowerCase()
@@ -229,7 +213,6 @@ export const buildTestAgentDocumentData = ({
   maxRunsPerMinute: 12,
   name: 'Test Agent',
   placeholder: 'Say hello to verify the harness…',
-  secretReference: TEST_AGENT_SECRET_REFERENCE,
   server: serverID,
   slug: TEST_AGENT_SLUG,
   streamingEnabled: false,
@@ -368,7 +351,6 @@ export const runAgentSetupGuide = async ({
   agentID,
   endpointPath: endpointPathInput,
   req,
-  secretReference: secretReferenceInput,
   serverID: serverIDInput,
   slug: slugInput,
   syncWorkflows = false,
@@ -378,7 +360,6 @@ export const runAgentSetupGuide = async ({
   agentID?: string
   endpointPath?: string
   req: PayloadRequest
-  secretReference?: string
   serverID?: string
   slug?: string
   syncWorkflows?: boolean
@@ -402,29 +383,20 @@ export const runAgentSetupGuide = async ({
 
   const slug = slugInput?.trim() || agent?.slug || TEST_AGENT_SLUG
   const endpointPath = normalizeEndpointPath(endpointPathInput || agent?.endpointPath || DEFAULT_TEST_AGENT_ENDPOINT_PATH)
-  const secretReference =
-    secretReferenceInput?.trim() || agent?.secretReference?.trim() || TEST_AGENT_SECRET_REFERENCE
   const transport = transportInput || agent?.transport || 'webhook'
   const serverID = serverIDInput || getRelationID(agent?.server)
   const workflowID = workflowIDInput || getRelationID(agent?.workflow)
 
-  const envChecks = {
-    callbackSecretOK: checkCallbackSecretEnv(),
-    invocationSecretOK: checkInvocationSecretEnv(secretReference),
-  }
-
   const instructions = {
-    envVars: [secretReference, 'N8N_CALLBACK_SECRET'],
     n8nResponseExample: TEST_AGENT_N8N_RESPONSE_EXAMPLE,
     n8nWebhookPath: endpointPath,
-    secretReference,
     transport,
   }
 
   const baseChecks: AgentSetupGuideChecks = {
     agentOK: Boolean(agent?.id) || hasDraftAgentFields({ endpointPath, serverID, slug, workflowID }),
-    callbackSecretOK: envChecks.callbackSecretOK,
-    invocationSecretOK: envChecks.invocationSecretOK,
+    callbackSecretOK: checkCallbackSecretEnv(),
+    invocationSecretOK: agent ? Boolean(await getAgentInvocationSecret(req, agent.id)) : false,
     serverOK: false,
     workflowOK: false,
   }
