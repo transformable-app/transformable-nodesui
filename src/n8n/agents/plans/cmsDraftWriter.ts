@@ -305,10 +305,12 @@ const assertDraftMatchesBinding = (
   }
 }
 
-const validateLexicalFields = (
+const validateDraftFields = (
   document: Record<string, unknown>,
   fields: unknown,
   blocks: unknown,
+  mediaRequestPaths: Set<string>,
+  placeholderPaths: string[],
   prefix = '',
 ) => {
   if (!Array.isArray(fields)) return
@@ -322,8 +324,18 @@ const validateLexicalFields = (
       throw new APIError(`Rich text field "${path}" must wrap its Lexical root node in a root property.`, 400)
     }
 
+    if (field.type === 'upload' && !mediaRequestPaths.has(path)) {
+      const entries = Array.isArray(value) ? value : [value]
+      if (entries.some((entry) => {
+        const id = isPlainObject(entry) ? entry.value : entry
+        return typeof id === 'string' && /^media-(?:sample|placeholder)(?:-|$)/i.test(id)
+      })) {
+        placeholderPaths.push(path)
+      }
+    }
+
     if (isPlainObject(value)) {
-      validateLexicalFields(value, field.fields, blocks, path)
+      validateDraftFields(value, field.fields, blocks, mediaRequestPaths, placeholderPaths, path)
     }
 
     if (Array.isArray(value) && (field.type === 'array' || field.type === 'blocks')) {
@@ -332,7 +344,14 @@ const validateLexicalFields = (
         const block = field.type === 'blocks' && Array.isArray(blocks)
           ? blocks.find((candidate) => isPlainObject(candidate) && candidate.slug === row.blockType)
           : undefined
-        validateLexicalFields(row, block?.fields ?? field.fields, blocks, `${path}.${index}`)
+        validateDraftFields(
+          row,
+          block?.fields ?? field.fields,
+          blocks,
+          mediaRequestPaths,
+          placeholderPaths,
+          `${path}.${index}`,
+        )
       }
     }
   }
@@ -354,7 +373,21 @@ const validateDraftDocumentAgainstSite = ({
     throw new APIError(`Schema profile does not include collection "${collection}".`, 400)
   }
 
-  validateLexicalFields(document, collectionSchema.fields, collectionSchema.blocks)
+  const mediaRequestPaths = new Set(mediaRequests?.map(({ targetFieldPath }) => targetFieldPath))
+  const placeholderPaths: string[] = []
+  validateDraftFields(
+    document,
+    collectionSchema.fields,
+    collectionSchema.blocks,
+    mediaRequestPaths,
+    placeholderPaths,
+  )
+  if (placeholderPaths.length) {
+    throw new APIError(
+      `Placeholder media IDs in ${placeholderPaths.join(', ')}. Use existing target-site media IDs, supply media requests with real sources, or omit optional uploads.`,
+      400,
+    )
+  }
 
   const allowedPaths = getFieldAllowlist(site, collection)
   if (allowedPaths.length > 0) {

@@ -232,6 +232,41 @@ describe('cms-draft remote writer', () => {
     )
   })
 
+  it('reports placeholder uploads in nested fields before posting the draft', async () => {
+    const req = makeReq(makeSite({
+      fieldAllowlists: [],
+      schemaProfile: {
+        collections: [{
+          slug: 'pages',
+          fields: [
+            { name: 'hero', type: 'group', fields: [{ name: 'media', type: 'upload' }] },
+            { name: 'layout', type: 'blocks' },
+          ],
+          blocks: [{
+            slug: 'content',
+            fields: [{ name: 'image', type: 'upload' }],
+          }],
+        }],
+      },
+    }))
+
+    await expect(writeCMSDraftFromTaskOutput({
+      output: output({
+        document: {
+          hero: { media: 'media-sample-hero-background' },
+          layout: [{ blockType: 'content', image: 'media-sample-block' }],
+        },
+      }),
+      outputBinding: targetOnlyOutputBinding,
+      req: req as never,
+      runID: 'run-1',
+    })).rejects.toMatchObject({
+      message: expect.stringContaining('Placeholder media IDs in hero.media, layout.0.image.'),
+      retryable: true,
+    })
+    expect(mockedWriteDraftDocument).not.toHaveBeenCalled()
+  })
+
   it('fetches allowed media URLs, uploads media, and writes the uploaded media id into the document', async () => {
     const req = makeReq(makeSite())
     vi.stubGlobal(
