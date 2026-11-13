@@ -232,7 +232,10 @@ describe('cms-draft remote writer', () => {
     )
   })
 
-  it('reports placeholder uploads in nested fields before posting the draft', async () => {
+  it.each([
+    ['media-sample-hero-background', 'media-sample-block'],
+    ['media_hero_bg_001', 'media_meta_001'],
+  ])('reports placeholder upload %s before posting the draft', async (heroMedia, blockImage) => {
     const req = makeReq(makeSite({
       fieldAllowlists: [],
       schemaProfile: {
@@ -253,8 +256,8 @@ describe('cms-draft remote writer', () => {
     await expect(writeCMSDraftFromTaskOutput({
       output: output({
         document: {
-          hero: { media: 'media-sample-hero-background' },
-          layout: [{ blockType: 'content', image: 'media-sample-block' }],
+          hero: { media: heroMedia },
+          layout: [{ blockType: 'content', image: blockImage }],
         },
       }),
       outputBinding: targetOnlyOutputBinding,

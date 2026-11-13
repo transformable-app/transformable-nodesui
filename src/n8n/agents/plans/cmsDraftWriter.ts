@@ -44,6 +44,8 @@ type CMSDraftMediaRequest = {
   targetFieldPath: string
 }
 
+const placeholderMediaID = /^media-(?:sample|placeholder)(?:-|$)|^media_[a-z0-9]+(?:_[a-z0-9]+)*_0\d+$/i
+
 type CMSDraftOutputBinding = {
   allowedBlocks?: string[]
   allowedFields?: string[]
@@ -328,7 +330,7 @@ const validateDraftFields = (
       const entries = Array.isArray(value) ? value : [value]
       if (entries.some((entry) => {
         const id = isPlainObject(entry) ? entry.value : entry
-        return typeof id === 'string' && /^media-(?:sample|placeholder)(?:-|$)/i.test(id)
+        return typeof id === 'string' && placeholderMediaID.test(id)
       })) {
         placeholderPaths.push(path)
       }
