@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { redactValue, toPreview } from '@/n8n/agents/redact'
+import { redactValue, toOutputText } from '@/n8n/agents/redact'
 import type { AgentInvokeResult } from '@/n8n/agents/types'
 
 import {
@@ -173,8 +173,10 @@ export const finalizePlanTask = async ({
       errorMessage: cmsDraftError ?? (activeResponse.status === 'failed' ? activeResponse.content : undefined),
       finishedAt: finalStatus === 'succeeded' || finalStatus === 'failed' ? finishedAt : undefined,
       latestRun: activeRunID,
-      outputPreview: toPreview(activeOutputValue, 8000),
-      outputSummary: asPayloadJSON(redactValue(activeResponse.data ?? { content: activeResponse.content })),
+      outputPreview: toOutputText(activeOutputValue),
+      outputSummary: asPayloadJSON(
+        redactValue(activeResponse.data ?? { content: activeResponse.content }, Infinity),
+      ),
       status: finalStatus,
     },
     id: taskID,
@@ -287,8 +289,10 @@ export const finalizePlanTaskFromRun = async ({
       finishedAt:
         status === 'succeeded' || status === 'failed' ? new Date().toISOString() : undefined,
       latestRun: run.id,
-      outputPreview: toPreview(outputValue, 8000),
-      outputSummary: asPayloadJSON(redactValue(response.data ?? { content: response.content })),
+      outputPreview: toOutputText(outputValue),
+      outputSummary: asPayloadJSON(
+        redactValue(response.data ?? { content: response.content }, Infinity),
+      ),
       status,
     },
     id: taskID,

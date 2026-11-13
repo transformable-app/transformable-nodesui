@@ -1,4 +1,4 @@
-import { toPreview } from './redact'
+import { toOutputText } from './redact'
 import type { AgentInvocation, AgentInvokeResult } from './types'
 
 export const buildWebhookBody = (invocation: AgentInvocation) => invocation
@@ -6,7 +6,7 @@ export const buildWebhookBody = (invocation: AgentInvocation) => invocation
 export const parseWebhookResponse = (value: unknown): AgentInvokeResult => {
   if (!value || typeof value !== 'object') {
     return {
-      content: typeof value === 'string' ? value : toPreview(value),
+      content: toOutputText(value),
       status: 'succeeded',
     }
   }
@@ -41,7 +41,7 @@ export const parseWebhookResponse = (value: unknown): AgentInvokeResult => {
 
   return {
     approval,
-    content: typeof contentValue === 'string' ? contentValue : toPreview(contentValue ?? data),
+    content: toOutputText(contentValue ?? data),
     data:
       typeof structuredData === 'object' && structuredData
         ? (structuredData as Record<string, unknown>)

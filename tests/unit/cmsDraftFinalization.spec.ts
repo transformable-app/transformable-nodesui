@@ -50,11 +50,13 @@ describe('cms-draft finalization', () => {
 
   it('pauses a successful cms-draft task for approval after remote draft write succeeds', async () => {
     const req = makeReq()
+    const article = 'body '.repeat(2000) + 'end'
     const response = {
       content: 'done',
-      data: { document: { title: 'Draft' } },
+      data: { document: { title: 'Draft', article, apiKey: 'private' } },
       status: 'succeeded' as const,
     }
+    const redactedOutput = { document: { title: 'Draft', article, apiKey: '[redacted]' } }
 
     await finalizePlanTask({
       req: req as never,
@@ -79,6 +81,8 @@ describe('cms-draft finalization', () => {
         data: expect.objectContaining({
           errorMessage: undefined,
           finishedAt: undefined,
+          outputPreview: JSON.stringify(redactedOutput),
+          outputSummary: redactedOutput,
           status: 'needs-approval',
         }),
         id: 'task-1',
@@ -111,7 +115,8 @@ describe('cms-draft finalization', () => {
         collection: 'agent-plan-tasks',
         data: expect.objectContaining({
           errorCode: 'workflow-error',
-          errorMessage: 'Payload site write-back is not enabled.',
+          errorMessage:
+            'CMS draft write failed on attempt 1 of 3: Payload site write-back is not enabled.',
           status: 'failed',
         }),
         id: 'task-1',

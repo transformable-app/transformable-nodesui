@@ -114,6 +114,18 @@ describe('agent transport adapters', () => {
     })
   })
 
+  it.each([parseWebhookResponse, parseChatTriggerResponse])(
+    'keeps long nested output intact while redacting sensitive keys in %s',
+    (parseResponse) => {
+      const article = 'body '.repeat(2000) + 'end'
+      const result = parseResponse({ output: { sections: [{ article, apiKey: 'private' }] } })
+
+      expect(JSON.parse(result.content)).toEqual({
+        sections: [{ article, apiKey: '[redacted]' }],
+      })
+    },
+  )
+
   it('rejects n8n test webhook paths', () => {
     expect(() =>
       buildAgentEndpoint({

@@ -7,7 +7,7 @@ import { getRelationshipID, resolveAgentBySlug } from './resolveAgent'
 import { invokeN8nAgent, invokeN8nAgentStream, stopN8nExecution } from './adapters'
 import { finalizePlanTaskFromRun } from './plans/finalizeTask'
 import { resolveRemoteDraftPublishApproval } from './plans/remoteDraftApproval'
-import { redactValue, toPreview } from './redact'
+import { redactValue, toOutputText, toPreview } from './redact'
 import { AgentHarnessError, type AgentRequest, type AgentStreamEvent } from './types'
 import { observeFailure } from '@/notifications/service'
 
@@ -776,7 +776,9 @@ export const sendAgentMessage = async ({
         sequence: sequence + 1,
         session: sessionID,
         status: status === 'waiting' ? 'pending' : 'complete',
-        structuredContent: asPayloadJSON(response.data ? redactValue(response.data) : undefined),
+        structuredContent: asPayloadJSON(
+          response.data ? redactValue(response.data, Infinity) : undefined,
+        ),
       },
       overrideAccess: false,
       req,
@@ -790,7 +792,7 @@ export const sendAgentMessage = async ({
         finishedAt: status === 'succeeded' ? finishedAt.toISOString() : undefined,
         firstByteMS: finishedAt.getTime() - startedAt.getTime(),
         n8nExecutionID: response.n8nExecutionID,
-        outputPreview: toPreview(response.content),
+        outputPreview: toOutputText(response.data ?? response.content),
         sessionActiveLock: status === 'waiting' ? sessionID : `released:${run.id}`,
         status,
         usage: asPayloadJSON(response.usage ? redactValue(response.usage) : undefined),
@@ -1103,7 +1105,7 @@ export const streamAgentMessage = async ({
               ? streamResult.firstByteAt - startedAt.getTime()
               : undefined,
             n8nExecutionID: streamedExecutionID,
-            outputPreview: toPreview(content),
+            outputPreview: content,
             sessionActiveLock: `released:${run.id}`,
             status: 'succeeded',
           },
@@ -1645,7 +1647,8 @@ export const updateRunFromCallback = async (
   const status = body.status === 'failed' ? 'failed' : 'succeeded'
   const finishedAt = new Date()
   const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : finishedAt.getTime()
-  const content = typeof body.content === 'string' ? body.content : toPreview(body.output ?? body)
+  const content =
+    typeof body.content === 'string' ? body.content : toOutputText(body.output ?? body.data ?? body)
   const sessionID = getRelationshipID(run.session)
   const agentID = getRelationshipID(run.agent)
 
@@ -1672,7 +1675,7 @@ export const updateRunFromCallback = async (
       finishedAt: finishedAt.toISOString(),
       firstByteMS: typeof body.firstByteMS === 'number' ? body.firstByteMS : undefined,
       n8nExecutionID: typeof body.n8nExecutionID === 'string' ? body.n8nExecutionID : undefined,
-      outputPreview: toPreview(content),
+      outputPreview: toOutputText(body.data ?? body.output ?? content),
       sessionActiveLock: `released:${run.id}`,
       status,
       usage: asPayloadJSON(
@@ -1728,7 +1731,7 @@ export const updateRunFromCallback = async (
         session: sessionID,
         status: 'complete',
         structuredContent: asPayloadJSON(
-          body.data && typeof body.data === 'object' ? redactValue(body.data) : undefined,
+          body.data && typeof body.data === 'object' ? redactValue(body.data, Infinity) : undefined,
         ),
       },
       overrideAccess: true,

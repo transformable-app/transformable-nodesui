@@ -1,4 +1,4 @@
-import { toPreview } from './redact'
+import { toOutputText } from './redact'
 import type { AgentInvocation, AgentInvokeResult } from './types'
 
 export const buildChatTriggerBody = (invocation: AgentInvocation) => ({
@@ -16,7 +16,7 @@ export const buildChatTriggerBody = (invocation: AgentInvocation) => ({
 export const parseChatTriggerResponse = (value: unknown): AgentInvokeResult => {
   if (!value || typeof value !== 'object') {
     return {
-      content: typeof value === 'string' ? value : toPreview(value),
+      content: toOutputText(value),
       status: 'succeeded',
     }
   }
@@ -26,7 +26,7 @@ export const parseChatTriggerResponse = (value: unknown): AgentInvokeResult => {
   const structuredData = data.data ?? data.output ?? (data.target && data.document ? data : undefined)
 
   return {
-    content: typeof contentValue === 'string' ? contentValue : toPreview(contentValue ?? data),
+    content: toOutputText(contentValue ?? data),
     data:
       typeof structuredData === 'object' && structuredData
         ? (structuredData as Record<string, unknown>)

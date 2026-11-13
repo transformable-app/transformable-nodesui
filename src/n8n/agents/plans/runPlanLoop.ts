@@ -4,7 +4,7 @@ import type { PayloadRequest } from 'payload'
 
 import type { AgentPlan, AgentPlanTask } from '@/payload-types'
 import { invokeN8nAgent } from '@/n8n/agents/adapters'
-import { redactValue, toPreview } from '@/n8n/agents/redact'
+import { redactValue, toOutputText, toPreview } from '@/n8n/agents/redact'
 import { userCanInvokeAgent } from '@/n8n/agents/resolveAgent'
 import { AgentHarnessError, type AgentRequest } from '@/n8n/agents/types'
 import { assertSameServerURL } from '@/n8n/agents/buildEndpoint'
@@ -295,7 +295,7 @@ const invokeCMSDraftRetry = async ({
         finishedAt: finishedAt.toISOString(),
         firstByteMS: finishedAt.getTime() - startedAt.getTime(),
         n8nExecutionID: response.n8nExecutionID,
-        outputPreview: toPreview(response.data ?? response.content, 8000),
+        outputPreview: toOutputText(response.data ?? response.content),
         status: response.status === 'succeeded' ? 'succeeded' : 'failed',
         errorCode: response.status === 'succeeded' ? undefined : 'workflow-error',
         errorMessage: response.status === 'succeeded' ? undefined : response.content,
@@ -566,7 +566,7 @@ const dispatchPlanTask = async ({
         finishedAt: runStatus === 'waiting' ? undefined : finishedAt.toISOString(),
         firstByteMS: finishedAt.getTime() - startedAt.getTime(),
         n8nExecutionID: response.n8nExecutionID,
-        outputPreview: toPreview(response.data ?? response.content, 8000),
+        outputPreview: toOutputText(response.data ?? response.content),
         status: runStatus,
         usage: asPayloadJSON(response.usage ? redactValue(response.usage) : undefined),
       },
